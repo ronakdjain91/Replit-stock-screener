@@ -12,6 +12,7 @@ modules = ["python-3.10", "python-3.11"]
 # Specifies which nix channel to use when building the environment.
 [nix]
 channel = "stable-22_11"
+packages = ["gdb", "glibcLocales"]
 
 [env]
 
