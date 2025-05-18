@@ -1,5 +1,5 @@
 import pandas as pd
-from numpy import nan as nan
+import numpy as np
 import pandas_ta as ta
 import yfinance
 
