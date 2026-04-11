@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nifty Stock Scanner</title>
+  <!-- DataTables + jQuery -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css"/>
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f2040 100%);
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 2px solid #2563eb;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    header .logo {
+      font-size: 28px;
+      font-weight: 800;
+      color: #60a5fa;
+      letter-spacing: -0.5px;
+    }
+
+    header .subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 0 32px;
+    }
+
+    .tab-btn {
+      padding: 14px 24px;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover { color: #e2e8f0; }
+    .tab-btn.active {
+      color: #60a5fa;
+      border-bottom-color: #60a5fa;
+    }
+
+    .container { padding: 28px 32px; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid #334155;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .card-meta {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #1e3a5f; color: #475569; cursor: not-allowed; }
+
+    .btn-success {
+      background: #059669;
+      color: white;
+    }
+    .btn-success:hover { background: #047857; }
+
+    .btn-outline {
+      background: transparent;
+      color: #60a5fa;
+      border: 1px solid #2563eb;
+    }
+    .btn-outline:hover { background: #1e3a5f; }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-idle { background: #1e293b; color: #64748b; border: 1px solid #334155; }
+    .status-running { background: #1e3a5f; color: #60a5fa; border: 1px solid #2563eb; }
+    .status-done { background: #064e3b; color: #34d399; border: 1px solid #059669; }
+    .status-error { background: #450a0a; color: #f87171; border: 1px solid #dc2626; }
+
+    .spinner {
+      width: 10px; height: 10px;
+      border: 2px solid #2563eb;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+
+    .filter-row input, .filter-row select {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .filter-row input:focus, .filter-row select:focus {
+      border-color: #2563eb;
+    }
+
+    .filter-label {
+      font-size: 12px;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 10px;
+    }
+
+    table.display {
+      width: 100% !important;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    table.display thead th {
+      background: #0f172a !important;
+      color: #94a3b8 !important;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 12px 14px !important;
+      border-bottom: 1px solid #334155 !important;
+      white-space: nowrap;
+    }
+
+    table.display tbody tr {
+      background: #1e293b !important;
+      border-bottom: 1px solid #1a2640 !important;
+      transition: background 0.15s;
+    }
+
+    table.display tbody tr:hover {
+      background: #263552 !important;
+    }
+
+    table.display tbody td {
+      padding: 11px 14px !important;
+      color: #cbd5e1;
+      border: none !important;
+    }
+
+    .signal-buy {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      background: #064e3b;
+      color: #34d399;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .signal-sell {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      background: #450a0a;
+      color: #f87171;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .signal-hold {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      background: #431407;
+      color: #fb923c;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .signal-neutral {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      background: #1e293b;
+      color: #64748b;
+      font-size: 12px;
+    }
+
+    .tv-link {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .tv-link:hover { text-decoration: underline; }
+
+    .pos-val { color: #34d399; }
+    .neg-val { color: #f87171; }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #475569;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state p { font-size: 15px; }
+    .empty-state small { font-size: 13px; color: #334155; }
+
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_filter,
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate {
+      color: #64748b !important;
+      font-size: 13px;
+    }
+
+    .dataTables_wrapper .dataTables_length select,
+    .dataTables_wrapper .dataTables_filter input {
+      background: #0f172a !important;
+      color: #e2e8f0 !important;
+      border: 1px solid #334155 !important;
+      border-radius: 6px !important;
+      padding: 4px 8px !important;
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+      color: #64748b !important;
+      border-radius: 6px !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+      background: #1e3a5f !important;
+      color: #60a5fa !important;
+      border-color: #2563eb !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+      background: #2563eb !important;
+      color: white !important;
+      border-color: #2563eb !important;
+    }
+
+    .dt-buttons { margin-bottom: 10px; }
+    .dt-button {
+      background: #059669 !important;
+      color: white !important;
+      border: none !important;
+      border-radius: 8px !important;
+      padding: 7px 16px !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      cursor: pointer !important;
+    }
+    .dt-button:hover { background: #047857 !important; }
+
+    .pct-pos { color: #34d399; font-weight: 600; }
+    .pct-neg { color: #f87171; font-weight: 600; }
+
+    @media (max-width: 600px) {
+      .container { padding: 16px; }
+      header { padding: 14px 16px; }
+      .tabs { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Nifty Stock Scanner</div>
+    <div class="subtitle">Technical &amp; Fundamental Analysis Dashboard</div>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('main', this)">Nifty 100 — Technical Signals</button>
+  <button class="tab-btn" onclick="switchTab('nifty', this)">Nifty 50 — Fund + Tech Score</button>
+</div>
+
+<div class="container">
+
+  <!-- TAB: Main (nifty100 signals) -->
+  <div class="panel active" id="panel-main">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Nifty 100 — MACD / RSI / UT Bot Signals</div>
+          <div class="card-meta" id="meta-main">Weekly data · 1 year lookback</div>
+        </div>
+        <div class="actions">
+          <span class="status-badge status-idle" id="badge-main">Idle</span>
+          <button class="btn btn-primary" id="run-main" onclick="runScanner('main')">
+            <span>&#9654;</span> Run Scanner
+          </button>
+          <a href="/api/download/main" class="btn btn-success" id="dl-main">
+            <span>&#8595;</span> Download CSV
+          </a>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Filter by Signal:</span>
+        <select id="filter-macd" onchange="applyFilters('main')">
+          <option value="">MACD — All</option>
+          <option value="Buy">Buy</option>
+          <option value="Sell">Sell</option>
+          <option value="---">Neutral (---)</option>
+        </select>
+        <select id="filter-rsi" onchange="applyFilters('main')">
+          <option value="">RSI — All</option>
+          <option value="Buy">Buy</option>
+          <option value="Sell">Sell</option>
+          <option value="---">Neutral (---)</option>
+        </select>
+        <select id="filter-utbot" onchange="applyFilters('main')">
+          <option value="">UT Bot — All</option>
+          <option value="Buy">Buy</option>
+          <option value="Sell">Sell</option>
+          <option value="---">Neutral (---)</option>
+        </select>
+        <button class="btn btn-outline" onclick="clearFilters('main')">Clear Filters</button>
+      </div>
+
+      <div class="table-wrap">
+        <div id="empty-main" class="empty-state" style="display:none">
+          <div class="icon">📊</div>
+          <p>No scan data yet.</p>
+          <small>Click "Run Scanner" to fetch live data or check if nifty50_signals.csv exists.</small>
+        </div>
+        <table id="table-main" class="display" style="display:none"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Nifty (nifty50 fund+tech) -->
+  <div class="panel" id="panel-nifty">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Nifty 50 — Fundamental + Technical Scoring</div>
+          <div class="card-meta" id="meta-nifty">Daily data · 1 year lookback · 60% Fund + 40% Tech</div>
+        </div>
+        <div class="actions">
+          <span class="status-badge status-idle" id="badge-nifty">Idle</span>
+          <button class="btn btn-primary" id="run-nifty" onclick="runScanner('nifty')">
+            <span>&#9654;</span> Run Scanner
+          </button>
+          <a href="/api/download/nifty" class="btn btn-success" id="dl-nifty">
+            <span>&#8595;</span> Download CSV
+          </a>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <span class="filter-label">Filter by Recommendation:</span>
+        <select id="filter-rec" onchange="applyFilters('nifty')">
+          <option value="">All Recommendations</option>
+          <option value="Buy">Buy</option>
+          <option value="Hold">Hold</option>
+          <option value="Sell">Sell</option>
+        </select>
+        <button class="btn btn-outline" onclick="clearFilters('nifty')">Clear Filters</button>
+      </div>
+
+      <div class="table-wrap">
+        <div id="empty-nifty" class="empty-state" style="display:none">
+          <div class="icon">📈</div>
+          <p>No scan data yet.</p>
+          <small>Click "Run Scanner" to start. This may take a few minutes to fetch live data.</small>
+        </div>
+        <table id="table-nifty" class="display" style="display:none"></table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let tables = {};
+  let rawData = { main: null, nifty: null };
+
+  // ---- Tab switching ----
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + name).classList.add('active');
+  }
+
+  // ---- Signal badge renderer ----
+  function signalBadge(val) {
+    if (!val || val === '---') return `<span class="signal-neutral">—</span>`;
+    if (val === 'Buy') return `<span class="signal-buy">Buy</span>`;
+    if (val === 'Sell') return `<span class="signal-sell">Sell</span>`;
+    if (val === 'Hold') return `<span class="signal-hold">Hold</span>`;
+    return `<span class="signal-neutral">${val}</span>`;
+  }
+
+  function fmtNum(val, decimals) {
+    if (val === '' || val === null || val === undefined) return '—';
+    const n = parseFloat(val);
+    if (isNaN(n)) return val;
+    return n.toFixed(decimals);
+  }
+
+  function fmtPct(val) {
+    if (val === '' || val === null || val === undefined) return '—';
+    const n = parseFloat(val);
+    if (isNaN(n)) return val;
+    const cls = n >= 0 ? 'pct-pos' : 'pct-neg';
+    return `<span class="${cls}">${n >= 0 ? '+' : ''}${n.toFixed(2)}%</span>`;
+  }
+
+  // ---- Build main table ----
+  function buildMainTable(data) {
+    rawData.main = data;
+    const { columns, rows, generated_at } = data;
+
+    if (!rows || rows.length === 0) {
+      document.getElementById('empty-main').style.display = 'block';
+      document.getElementById('table-main').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('empty-main').style.display = 'none';
+    document.getElementById('table-main').style.display = '';
+
+    if (generated_at) {
+      document.getElementById('meta-main').textContent = `Weekly data · Last scan: ${generated_at}`;
+    }
+
+    // Build column defs
+    const colDefs = columns.map((col, idx) => {
+      if (col === 'TradingView Link' || col === 'tradingview') {
+        return {
+          title: 'Chart', targets: idx,
+          render: (d) => d ? `<a href="${d}" target="_blank" class="tv-link">&#128279; View</a>` : '—'
+        };
+      }
+      if (['MACD Signal', 'RSI Signal', 'UT Bot Signal', 'recommendation'].includes(col)) {
+        return { title: col, targets: idx, render: (d) => signalBadge(d) };
+      }
+      if (col === 'Last Day % Movement') {
+        return { title: '% Move', targets: idx, render: (d) => fmtPct(d) };
+      }
+      if (col === 'Current Price' || col === 'current_price') {
+        return { title: 'Price', targets: idx, render: (d) => fmtNum(d, 2) };
+      }
+      if (col.startsWith('MACD_')) {
+        return { title: col, targets: idx, render: (d) => fmtNum(d, 3) };
+      }
+      if (col.startsWith('RSI_')) {
+        return { title: col, targets: idx, render: (d) => fmtNum(d, 1) };
+      }
+      if (col.startsWith('TrailingStop_')) {
+        return { title: col, targets: idx, render: (d) => fmtNum(d, 2) };
+      }
+      return { title: col, targets: idx };
+    });
+
+    if (tables['main']) { tables['main'].destroy(); $('#table-main').empty(); }
+
+    tables['main'] = $('#table-main').DataTable({
+      data: rows,
+      columns: columns.map(c => ({ title: c })),
+      columnDefs: colDefs,
+      pageLength: 25,
+      lengthMenu: [10, 25, 50, 100],
+      order: [[0, 'asc']],
+      dom: 'Blfrtip',
+      buttons: [
+        {
+          extend: 'csvHtml5',
+          text: '&#8595; Export Filtered CSV',
+          className: 'dt-button',
+          filename: 'nifty100_signals_filtered',
+          exportOptions: { modifier: { search: 'applied' } }
+        }
+      ],
+      scrollX: true,
+      language: { search: 'Quick search:', emptyTable: 'No data available.' }
+    });
+  }
+
+  // ---- Build nifty table ----
+  function buildNiftyTable(data) {
+    rawData.nifty = data;
+    const { columns, rows, generated_at } = data;
+
+    if (!rows || rows.length === 0) {
+      document.getElementById('empty-nifty').style.display = 'block';
+      document.getElementById('table-nifty').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('empty-nifty').style.display = 'none';
+    document.getElementById('table-nifty').style.display = '';
+
+    if (generated_at) {
+      document.getElementById('meta-nifty').textContent =
+        `Daily data · 60% Fund + 40% Tech · Last scan: ${generated_at}`;
+    }
+
+    const colDefs = columns.map((col, idx) => {
+      if (col === 'tradingview') {
+        return {
+          title: 'Chart', targets: idx,
+          render: (d) => d ? `<a href="${d}" target="_blank" class="tv-link">&#128279; View</a>` : '—'
+        };
+      }
+      if (col === 'recommendation') {
+        return { title: 'Recommendation', targets: idx, render: (d) => signalBadge(d) };
+      }
+      if (col === 'current_price') {
+        return { title: 'Price', targets: idx, render: (d) => fmtNum(d, 2) };
+      }
+      if (col === 'final_score') {
+        return { title: 'Final Score', targets: idx, render: (d) => fmtNum(d, 3) };
+      }
+      return { title: col, targets: idx };
+    });
+
+    if (tables['nifty']) { tables['nifty'].destroy(); $('#table-nifty').empty(); }
+
+    tables['nifty'] = $('#table-nifty').DataTable({
+      data: rows,
+      columns: columns.map(c => ({ title: c })),
+      columnDefs: colDefs,
+      pageLength: 25,
+      lengthMenu: [10, 25, 50, 100],
+      order: [[columns.indexOf('final_score') >= 0 ? columns.indexOf('final_score') : 0, 'desc']],
+      dom: 'Blfrtip',
+      buttons: [
+        {
+          extend: 'csvHtml5',
+          text: '&#8595; Export Filtered CSV',
+          className: 'dt-button',
+          filename: 'nifty50_scan_filtered',
+          exportOptions: { modifier: { search: 'applied' } }
+        }
+      ],
+      scrollX: true,
+      language: { search: 'Quick search:', emptyTable: 'No data available.' }
+    });
+  }
+
+  // ---- Apply custom column filters ----
+  function applyFilters(tab) {
+    if (tab === 'main' && tables['main']) {
+      const data = rawData.main;
+      const cols = data.columns;
+      const macdVal = document.getElementById('filter-macd').value;
+      const rsiVal = document.getElementById('filter-rsi').value;
+      const utVal = document.getElementById('filter-utbot').value;
+
+      const macdIdx = cols.indexOf('MACD Signal');
+      const rsiIdx = cols.indexOf('RSI Signal');
+      const utIdx = cols.indexOf('UT Bot Signal');
+
+      let filtered = data.rows;
+      if (macdVal && macdIdx >= 0) filtered = filtered.filter(r => String(r[macdIdx]) === macdVal);
+      if (rsiVal && rsiIdx >= 0) filtered = filtered.filter(r => String(r[rsiIdx]) === rsiVal);
+      if (utVal && utIdx >= 0) filtered = filtered.filter(r => String(r[utIdx]) === utVal);
+
+      tables['main'].clear().rows.add(filtered).draw();
+    }
+
+    if (tab === 'nifty' && tables['nifty']) {
+      const data = rawData.nifty;
+      const cols = data.columns;
+      const recVal = document.getElementById('filter-rec').value;
+      const recIdx = cols.indexOf('recommendation');
+
+      let filtered = data.rows;
+      if (recVal && recIdx >= 0) filtered = filtered.filter(r => String(r[recIdx]) === recVal);
+
+      tables['nifty'].clear().rows.add(filtered).draw();
+    }
+  }
+
+  function clearFilters(tab) {
+    if (tab === 'main') {
+      document.getElementById('filter-macd').value = '';
+      document.getElementById('filter-rsi').value = '';
+      document.getElementById('filter-utbot').value = '';
+      if (tables['main'] && rawData.main) {
+        tables['main'].clear().rows.add(rawData.main.rows).draw();
+      }
+    }
+    if (tab === 'nifty') {
+      document.getElementById('filter-rec').value = '';
+      if (tables['nifty'] && rawData.nifty) {
+        tables['nifty'].clear().rows.add(rawData.nifty.rows).draw();
+      }
+    }
+  }
+
+  // ---- Run scanner ----
+  function runScanner(name) {
+    setBadge(name, 'running');
+    document.getElementById('run-' + name).disabled = true;
+    fetch('/api/run/' + name, { method: 'POST' })
+      .then(r => r.json())
+      .then(() => pollStatus(name));
+  }
+
+  function pollStatus(name) {
+    fetch('/api/status/' + name)
+      .then(r => r.json())
+      .then(d => {
+        const s = d.status;
+        setBadge(name, s.startsWith('error') ? 'error' : s);
+        if (s === 'running') {
+          setTimeout(() => pollStatus(name), 3000);
+        } else if (s === 'done') {
+          document.getElementById('run-' + name).disabled = false;
+          loadData(name);
+        } else if (s.startsWith('error')) {
+          document.getElementById('run-' + name).disabled = false;
+        }
+      });
+  }
+
+  function setBadge(name, status) {
+    const el = document.getElementById('badge-' + name);
+    el.className = 'status-badge';
+    if (status === 'running') {
+      el.classList.add('status-running');
+      el.innerHTML = '<div class="spinner"></div> Running…';
+    } else if (status === 'done') {
+      el.classList.add('status-done');
+      el.innerHTML = '&#10003; Done';
+    } else if (status === 'error' || status.startsWith('error')) {
+      el.classList.add('status-error');
+      el.innerHTML = '&#10007; Error';
+    } else {
+      el.classList.add('status-idle');
+      el.innerHTML = 'Idle';
+    }
+  }
+
+  // ---- Load data from server ----
+  function loadData(name) {
+    fetch('/api/data/' + name)
+      .then(r => r.json())
+      .then(data => {
+        if (name === 'main') buildMainTable(data);
+        else buildNiftyTable(data);
+      });
+  }
+
+  // ---- Init ----
+  loadData('main');
+  loadData('nifty');
+</script>
+</body>
+</html>
