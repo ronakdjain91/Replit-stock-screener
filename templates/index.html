@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Nifty Stock Scanner</title>
-  <!-- DataTables + jQuery -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css"/>
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
@@ -13,338 +12,228 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      min-height: 100vh;
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0b1221;--surface:#111827;--surface2:#1a2540;
+      --border:#1e2d45;--accent:#3b82f6;--accent2:#60a5fa;
+      --green:#10b981;--red:#ef4444;--orange:#f97316;--yellow:#eab308;
+      --text:#e2e8f0;--muted:#64748b;--muted2:#94a3b8;
     }
+    body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 
-    header {
-      background: linear-gradient(135deg, #1e3a5f 0%, #0f2040 100%);
-      padding: 20px 32px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      border-bottom: 2px solid #2563eb;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    /* HEADER */
+    header{
+      background:linear-gradient(135deg,#0f2040,#111827);
+      padding:16px 28px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid var(--border);
     }
+    .logo{font-size:20px;font-weight:800;color:var(--accent2);letter-spacing:-0.3px}
+    .logo span{color:var(--text);font-weight:400}
+    .header-right{display:flex;gap:10px;align-items:center}
 
-    header .logo {
-      font-size: 28px;
-      font-weight: 800;
-      color: #60a5fa;
-      letter-spacing: -0.5px;
-    }
+    /* TABS */
+    .tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;gap:4px}
+    .tab-btn{padding:13px 20px;background:none;border:none;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+    .tab-btn:hover{color:var(--text)}
+    .tab-btn.active{color:var(--accent2);border-bottom-color:var(--accent2)}
 
-    header .subtitle {
-      font-size: 13px;
-      color: #94a3b8;
-      margin-top: 2px;
-    }
+    /* LAYOUT */
+    .container{padding:24px 28px;max-width:1600px;margin:0 auto}
+    .panel{display:none}
+    .panel.active{display:block}
 
-    .tabs {
-      display: flex;
-      gap: 0;
-      background: #1e293b;
-      border-bottom: 1px solid #334155;
-      padding: 0 32px;
+    /* STAT CARDS */
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+    .stat-card{
+      background:var(--surface);border:1px solid var(--border);border-radius:10px;
+      padding:16px;display:flex;flex-direction:column;gap:4px;
     }
+    .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+    .stat-value{font-size:26px;font-weight:700;line-height:1}
+    .stat-value.buy{color:var(--green)}
+    .stat-value.sell{color:var(--red)}
+    .stat-value.hold{color:var(--orange)}
+    .stat-value.neutral{color:var(--muted2)}
+    .stat-value.total{color:var(--accent2)}
+    .stat-sub{font-size:11px;color:var(--muted);margin-top:2px}
 
-    .tab-btn {
-      padding: 14px 24px;
-      background: none;
-      border: none;
-      color: #94a3b8;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      border-bottom: 3px solid transparent;
-      transition: all 0.2s;
+    /* TOOLBAR */
+    .toolbar{
+      background:var(--surface);border:1px solid var(--border);border-radius:10px;
+      padding:16px 20px;margin-bottom:16px;
+      display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
     }
+    .toolbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .toolbar-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap}
+    .toolbar-meta{font-size:12px;color:var(--muted)}
 
-    .tab-btn:hover { color: #e2e8f0; }
-    .tab-btn.active {
-      color: #60a5fa;
-      border-bottom-color: #60a5fa;
+    /* FILTERS */
+    .filters-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+    .filter-group{display:flex;align-items:center;gap:6px}
+    .filter-group label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+    select.filter-sel{
+      padding:6px 10px;border-radius:7px;border:1px solid var(--border);
+      background:var(--bg);color:var(--text);font-size:13px;outline:none;cursor:pointer;
+      transition:border-color .2s
     }
+    select.filter-sel:focus{border-color:var(--accent)}
 
-    .container { padding: 28px 32px; }
+    /* BUTTONS */
+    .btn{
+      padding:7px 14px;border-radius:8px;border:none;font-size:12px;font-weight:600;
+      cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:5px;
+      white-space:nowrap
+    }
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-primary:hover{background:#2563eb}
+    .btn-primary:disabled{background:#1e3a5f;color:var(--muted);cursor:not-allowed}
+    .btn-success{background:var(--green);color:#fff}
+    .btn-success:hover{background:#059669}
+    .btn-outline{background:transparent;color:var(--accent2);border:1px solid var(--accent)}
+    .btn-outline:hover{background:#1e3a5f}
+    .btn-danger{background:#7f1d1d;color:#fca5a5;border:none}
+    .btn-danger:hover{background:#991b1b}
+    .btn-sm{padding:4px 10px;font-size:11px;border-radius:6px}
+    .btn-ghost{background:transparent;color:var(--muted2);border:1px solid var(--border)}
+    .btn-ghost:hover{background:var(--surface2);color:var(--text)}
 
-    .panel { display: none; }
-    .panel.active { display: block; }
+    /* STATUS BADGE */
+    .status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:600}
+    .s-idle{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+    .s-running{background:#1e3a5f;color:var(--accent2);border:1px solid var(--accent)}
+    .s-done{background:#052e16;color:var(--green);border:1px solid var(--green)}
+    .s-error{background:#450a0a;color:#f87171;border:1px solid var(--red)}
+    .spinner{width:9px;height:9px;border:2px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
 
-    .card {
-      background: #1e293b;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
-      border: 1px solid #334155;
-    }
+    /* SIGNAL BADGES */
+    .sig{display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700}
+    .sig-buy{background:#052e16;color:#4ade80}
+    .sig-sell{background:#450a0a;color:#f87171}
+    .sig-hold{background:#431407;color:#fb923c}
+    .sig-neutral{background:var(--surface2);color:var(--muted);font-weight:400}
 
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
+    /* RSI COLOR */
+    .rsi-low{color:#f87171;font-weight:600}
+    .rsi-high{color:#fb923c;font-weight:600}
+    .rsi-ok{color:#4ade80;font-weight:600}
+    .rsi-mid{color:var(--muted2)}
 
-    .card-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #f1f5f9;
-    }
+    /* MINI SPARKLINE */
+    .spark{display:inline-flex;align-items:flex-end;gap:1px;height:18px;vertical-align:middle}
+    .spark-bar{width:4px;border-radius:1px 1px 0 0;min-height:2px}
 
-    .card-meta {
-      font-size: 12px;
-      color: #64748b;
-    }
+    /* TV LINK */
+    .tv-link{color:var(--accent2);text-decoration:none;font-size:12px;display:inline-flex;align-items:center;gap:3px}
+    .tv-link:hover{text-decoration:underline}
 
-    .actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
+    /* STOCK NAME */
+    .stock-name{font-weight:600;color:var(--text);font-size:13px}
+    .stock-sub{font-size:10px;color:var(--muted);margin-top:1px}
 
-    .btn {
-      padding: 8px 18px;
-      border-radius: 8px;
-      border: none;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    /* TABLE */
+    .table-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+    .table-wrap{overflow-x:auto}
+    table.dt{width:100%!important;border-collapse:collapse;font-size:13px}
+    table.dt thead th{
+      background:#0a1628!important;color:var(--muted2)!important;font-weight:600;
+      font-size:11px;text-transform:uppercase;letter-spacing:.4px;
+      padding:11px 14px!important;border-bottom:1px solid var(--border)!important;
+      white-space:nowrap;
     }
+    table.dt tbody tr{background:var(--surface)!important;border-bottom:1px solid #141f33!important;transition:background .1s}
+    table.dt tbody tr:hover{background:#162035!important}
+    table.dt tbody td{padding:10px 14px!important;color:#cbd5e1;border:none!important}
+    .pct-pos{color:var(--green);font-weight:600}
+    .pct-neg{color:var(--red);font-weight:600}
+    .pct-zero{color:var(--muted2)}
 
-    .btn-primary {
-      background: #2563eb;
-      color: white;
-    }
-    .btn-primary:hover { background: #1d4ed8; }
-    .btn-primary:disabled { background: #1e3a5f; color: #475569; cursor: not-allowed; }
-
-    .btn-success {
-      background: #059669;
-      color: white;
-    }
-    .btn-success:hover { background: #047857; }
-
-    .btn-outline {
-      background: transparent;
-      color: #60a5fa;
-      border: 1px solid #2563eb;
-    }
-    .btn-outline:hover { background: #1e3a5f; }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 99px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .status-idle { background: #1e293b; color: #64748b; border: 1px solid #334155; }
-    .status-running { background: #1e3a5f; color: #60a5fa; border: 1px solid #2563eb; }
-    .status-done { background: #064e3b; color: #34d399; border: 1px solid #059669; }
-    .status-error { background: #450a0a; color: #f87171; border: 1px solid #dc2626; }
-
-    .spinner {
-      width: 10px; height: 10px;
-      border: 2px solid #2563eb;
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .filter-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 16px;
-      align-items: center;
-    }
-
-    .filter-row input, .filter-row select {
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid #334155;
-      background: #0f172a;
-      color: #e2e8f0;
-      font-size: 13px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .filter-row input:focus, .filter-row select:focus {
-      border-color: #2563eb;
-    }
-
-    .filter-label {
-      font-size: 12px;
-      color: #64748b;
-      white-space: nowrap;
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-      border-radius: 10px;
-    }
-
-    table.display {
-      width: 100% !important;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    table.display thead th {
-      background: #0f172a !important;
-      color: #94a3b8 !important;
-      font-weight: 600;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 12px 14px !important;
-      border-bottom: 1px solid #334155 !important;
-      white-space: nowrap;
-    }
-
-    table.display tbody tr {
-      background: #1e293b !important;
-      border-bottom: 1px solid #1a2640 !important;
-      transition: background 0.15s;
-    }
-
-    table.display tbody tr:hover {
-      background: #263552 !important;
-    }
-
-    table.display tbody td {
-      padding: 11px 14px !important;
-      color: #cbd5e1;
-      border: none !important;
-    }
-
-    .signal-buy {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 99px;
-      background: #064e3b;
-      color: #34d399;
-      font-weight: 700;
-      font-size: 12px;
-    }
-    .signal-sell {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 99px;
-      background: #450a0a;
-      color: #f87171;
-      font-weight: 700;
-      font-size: 12px;
-    }
-    .signal-hold {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 99px;
-      background: #431407;
-      color: #fb923c;
-      font-weight: 700;
-      font-size: 12px;
-    }
-    .signal-neutral {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 99px;
-      background: #1e293b;
-      color: #64748b;
-      font-size: 12px;
-    }
-
-    .tv-link {
-      color: #60a5fa;
-      text-decoration: none;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-    .tv-link:hover { text-decoration: underline; }
-
-    .pos-val { color: #34d399; }
-    .neg-val { color: #f87171; }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #475569;
-    }
-    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
-    .empty-state p { font-size: 15px; }
-    .empty-state small { font-size: 13px; color: #334155; }
-
+    /* DT overrides */
     .dataTables_wrapper .dataTables_length,
     .dataTables_wrapper .dataTables_filter,
     .dataTables_wrapper .dataTables_info,
-    .dataTables_wrapper .dataTables_paginate {
-      color: #64748b !important;
-      font-size: 13px;
+    .dataTables_wrapper .dataTables_paginate{
+      color:var(--muted)!important;font-size:12px;padding:10px 14px
     }
-
     .dataTables_wrapper .dataTables_length select,
-    .dataTables_wrapper .dataTables_filter input {
-      background: #0f172a !important;
-      color: #e2e8f0 !important;
-      border: 1px solid #334155 !important;
-      border-radius: 6px !important;
-      padding: 4px 8px !important;
+    .dataTables_wrapper .dataTables_filter input{
+      background:var(--bg)!important;color:var(--text)!important;
+      border:1px solid var(--border)!important;border-radius:6px!important;padding:5px 8px!important;outline:none
     }
+    .dataTables_wrapper .dataTables_paginate .paginate_button{color:var(--muted)!important;border-radius:5px!important}
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover{background:#1e3a5f!important;color:var(--accent2)!important;border-color:var(--accent)!important}
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+    .dt-buttons{padding:10px 14px}
+    .dt-button{background:var(--surface2)!important;color:var(--muted2)!important;border:1px solid var(--border)!important;border-radius:7px!important;padding:6px 14px!important;font-size:12px!important;font-weight:600!important;cursor:pointer!important;margin-right:6px!important}
+    .dt-button:hover{background:#1e3a5f!important;color:var(--accent2)!important;border-color:var(--accent)!important}
 
-    .dataTables_wrapper .dataTables_paginate .paginate_button {
-      color: #64748b !important;
-      border-radius: 6px !important;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
-      background: #1e3a5f !important;
-      color: #60a5fa !important;
-      border-color: #2563eb !important;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-      background: #2563eb !important;
-      color: white !important;
-      border-color: #2563eb !important;
-    }
+    /* EMPTY STATE */
+    .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+    .empty-state .icon{font-size:44px;margin-bottom:14px}
+    .empty-state p{font-size:14px;margin-bottom:6px}
+    .empty-state small{font-size:12px;color:var(--muted)}
 
-    .dt-buttons { margin-bottom: 10px; }
-    .dt-button {
-      background: #059669 !important;
-      color: white !important;
-      border: none !important;
-      border-radius: 8px !important;
-      padding: 7px 16px !important;
-      font-size: 13px !important;
-      font-weight: 600 !important;
-      cursor: pointer !important;
+    /* MODAL */
+    .modal-overlay{
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;
+      align-items:center;justify-content:center;backdrop-filter:blur(2px);
     }
-    .dt-button:hover { background: #047857 !important; }
+    .modal-overlay.open{display:flex}
+    .modal{
+      background:var(--surface);border:1px solid var(--border);border-radius:14px;
+      width:100%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;
+      overflow:hidden;margin:16px;
+    }
+    .modal-header{
+      padding:20px 24px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .modal-title{font-size:16px;font-weight:700;color:var(--text)}
+    .modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;border-radius:4px}
+    .modal-close:hover{color:var(--text);background:var(--surface2)}
+    .modal-body{padding:20px 24px;overflow-y:auto;flex:1}
+    .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
 
-    .pct-pos { color: #34d399; font-weight: 600; }
-    .pct-neg { color: #f87171; font-weight: 600; }
+    .input-row{display:flex;gap:8px;margin-bottom:20px}
+    .input-row input{
+      flex:1;padding:9px 14px;border-radius:8px;border:1px solid var(--border);
+      background:var(--bg);color:var(--text);font-size:13px;outline:none;
+      transition:border-color .2s;
+    }
+    .input-row input:focus{border-color:var(--accent)}
+    .input-row input::placeholder{color:var(--muted)}
 
-    @media (max-width: 600px) {
-      .container { padding: 16px; }
-      header { padding: 14px 16px; }
-      .tabs { padding: 0 16px; }
+    .stocks-list-section{margin-top:4px}
+    .stocks-list-header{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:10px}
+    .stocks-grid{display:flex;flex-wrap:wrap;gap:6px;max-height:200px;overflow-y:auto;margin-bottom:16px}
+    .stock-chip{
+      display:inline-flex;align-items:center;gap:5px;padding:4px 10px;
+      border-radius:99px;background:var(--surface2);border:1px solid var(--border);
+      font-size:12px;color:var(--muted2);
+    }
+    .stock-chip.custom{background:#1e3a5f;border-color:var(--accent);color:var(--accent2)}
+    .stock-chip.custom .chip-remove{
+      background:none;border:none;color:#93c5fd;cursor:pointer;font-size:13px;
+      padding:0 2px;line-height:1;border-radius:50%;transition:all .2s
+    }
+    .stock-chip.custom .chip-remove:hover{color:#f87171;background:#450a0a}
+
+    .msg{padding:8px 12px;border-radius:7px;font-size:12px;margin-top:8px}
+    .msg-success{background:#052e16;color:#4ade80;border:1px solid #166534}
+    .msg-error{background:#450a0a;color:#f87171;border:1px solid #991b1b}
+
+    /* SCORE BAR */
+    .score-bar-wrap{display:flex;align-items:center;gap:8px}
+    .score-bar{height:6px;border-radius:3px;background:#1e293b;width:60px;overflow:hidden}
+    .score-fill{height:100%;border-radius:3px;transition:width .3s}
+    .score-label{font-size:12px;font-weight:600;white-space:nowrap}
+
+    @media(max-width:640px){
+      .container{padding:14px}
+      header{padding:12px 14px}
+      .tabs{padding:0 14px}
+      .stats-row{grid-template-columns:repeat(2,1fr)}
     }
   </style>
 </head>
@@ -352,391 +241,649 @@
 
 <header>
   <div>
-    <div class="logo">Nifty Stock Scanner</div>
-    <div class="subtitle">Technical &amp; Fundamental Analysis Dashboard</div>
+    <div class="logo">Nifty <span>Stock Scanner</span></div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost btn-sm" onclick="openStocksModal()">⚙ Manage Stocks</button>
   </div>
 </header>
 
 <div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('main', this)">Nifty 100 — Technical Signals</button>
-  <button class="tab-btn" onclick="switchTab('nifty', this)">Nifty 50 — Fund + Tech Score</button>
+  <button class="tab-btn active" onclick="switchTab('tech',this)">📈 Technical Signals — Nifty 100</button>
+  <button class="tab-btn" onclick="switchTab('fund',this)">🏦 Fund + Tech Score — Nifty 50</button>
 </div>
 
 <div class="container">
 
-  <!-- TAB: Main (nifty100 signals) -->
-  <div class="panel active" id="panel-main">
-    <div class="card">
-      <div class="card-header">
+  <!-- ===== TAB: TECHNICAL ===== -->
+  <div class="panel active" id="panel-tech">
+
+    <div class="stats-row" id="stats-tech">
+      <div class="stat-card">
+        <div class="stat-label">Total Stocks</div>
+        <div class="stat-value total" id="st-total">—</div>
+        <div class="stat-sub">in results</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">MACD Buy</div>
+        <div class="stat-value buy" id="st-macd-buy">—</div>
+        <div class="stat-sub">crossover signals</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">RSI Buy</div>
+        <div class="stat-value buy" id="st-rsi-buy">—</div>
+        <div class="stat-sub">oversold signals</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">UT Bot Buy</div>
+        <div class="stat-value buy" id="st-ut-buy">—</div>
+        <div class="stat-sub">buy signals</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">MACD Sell</div>
+        <div class="stat-value sell" id="st-macd-sell">—</div>
+        <div class="stat-sub">crossover signals</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">RSI Sell</div>
+        <div class="stat-value sell" id="st-rsi-sell">—</div>
+        <div class="stat-sub">overbought signals</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
         <div>
-          <div class="card-title">Nifty 100 — MACD / RSI / UT Bot Signals</div>
-          <div class="card-meta" id="meta-main">Weekly data · 1 year lookback</div>
-        </div>
-        <div class="actions">
-          <span class="status-badge status-idle" id="badge-main">Idle</span>
-          <button class="btn btn-primary" id="run-main" onclick="runScanner('main')">
-            <span>&#9654;</span> Run Scanner
-          </button>
-          <a href="/api/download/main" class="btn btn-success" id="dl-main">
-            <span>&#8595;</span> Download CSV
-          </a>
+          <div class="toolbar-title">MACD · RSI · UT Bot Signals &nbsp;<span class="toolbar-meta" id="meta-tech"></span></div>
         </div>
       </div>
-
-      <div class="filter-row">
-        <span class="filter-label">Filter by Signal:</span>
-        <select id="filter-macd" onchange="applyFilters('main')">
-          <option value="">MACD — All</option>
-          <option value="Buy">Buy</option>
-          <option value="Sell">Sell</option>
-          <option value="---">Neutral (---)</option>
-        </select>
-        <select id="filter-rsi" onchange="applyFilters('main')">
-          <option value="">RSI — All</option>
-          <option value="Buy">Buy</option>
-          <option value="Sell">Sell</option>
-          <option value="---">Neutral (---)</option>
-        </select>
-        <select id="filter-utbot" onchange="applyFilters('main')">
-          <option value="">UT Bot — All</option>
-          <option value="Buy">Buy</option>
-          <option value="Sell">Sell</option>
-          <option value="---">Neutral (---)</option>
-        </select>
-        <button class="btn btn-outline" onclick="clearFilters('main')">Clear Filters</button>
+      <div class="toolbar-right">
+        <span class="status-badge s-idle" id="badge-tech">Idle</span>
+        <button class="btn btn-primary" id="run-tech" onclick="runScanner('tech')">▶ Run Scanner</button>
+        <a href="/api/download/tech" class="btn btn-success">↓ Download CSV</a>
       </div>
+    </div>
 
-      <div class="table-wrap">
-        <div id="empty-main" class="empty-state" style="display:none">
-          <div class="icon">📊</div>
-          <p>No scan data yet.</p>
-          <small>Click "Run Scanner" to fetch live data or check if nifty50_signals.csv exists.</small>
-        </div>
-        <table id="table-main" class="display" style="display:none"></table>
+    <div class="filters-row">
+      <div class="filter-group">
+        <label>MACD</label>
+        <select class="filter-sel" id="f-macd" onchange="applyTechFilters()">
+          <option value="">All</option>
+          <option value="Buy">Buy</option>
+          <option value="Sell">Sell</option>
+          <option value="---">Neutral</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>RSI</label>
+        <select class="filter-sel" id="f-rsi" onchange="applyTechFilters()">
+          <option value="">All</option>
+          <option value="Buy">Buy</option>
+          <option value="Sell">Sell</option>
+          <option value="---">Neutral</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>UT Bot</label>
+        <select class="filter-sel" id="f-ut" onchange="applyTechFilters()">
+          <option value="">All</option>
+          <option value="Buy">Buy</option>
+          <option value="Sell">Sell</option>
+          <option value="---">Neutral</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>RSI Range</label>
+        <select class="filter-sel" id="f-rsi-range" onchange="applyTechFilters()">
+          <option value="">All</option>
+          <option value="oversold">Oversold (&lt;30)</option>
+          <option value="healthy">Healthy (30–70)</option>
+          <option value="overbought">Overbought (&gt;70)</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>% Move</label>
+        <select class="filter-sel" id="f-pct" onchange="applyTechFilters()">
+          <option value="">All</option>
+          <option value="up">Up (&gt;0%)</option>
+          <option value="down">Down (&lt;0%)</option>
+          <option value="up2">Strong (&gt;2%)</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="clearTechFilters()">✕ Clear</button>
+    </div>
+
+    <div class="table-card">
+      <div id="empty-tech" class="empty-state" style="display:none">
+        <div class="icon">📊</div>
+        <p>No scan data yet.</p>
+        <small>Click "Run Scanner" to fetch live data.</small>
+      </div>
+      <div class="table-wrap" id="wrap-tech" style="display:none">
+        <table id="table-tech" class="dt"></table>
       </div>
     </div>
   </div>
 
-  <!-- TAB: Nifty (nifty50 fund+tech) -->
-  <div class="panel" id="panel-nifty">
-    <div class="card">
-      <div class="card-header">
+  <!-- ===== TAB: FUNDAMENTAL ===== -->
+  <div class="panel" id="panel-fund">
+
+    <div class="stats-row" id="stats-fund">
+      <div class="stat-card">
+        <div class="stat-label">Total Stocks</div>
+        <div class="stat-value total" id="sf-total">—</div>
+        <div class="stat-sub">scanned</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Buy</div>
+        <div class="stat-value buy" id="sf-buy">—</div>
+        <div class="stat-sub">recommended</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Hold</div>
+        <div class="stat-value hold" id="sf-hold">—</div>
+        <div class="stat-sub">recommended</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Sell</div>
+        <div class="stat-value sell" id="sf-sell">—</div>
+        <div class="stat-sub">recommended</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Fund Score</div>
+        <div class="stat-value total" id="sf-avg-fund">—</div>
+        <div class="stat-sub">out of 5</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Tech Score</div>
+        <div class="stat-value total" id="sf-avg-tech">—</div>
+        <div class="stat-sub">out of 5</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
         <div>
-          <div class="card-title">Nifty 50 — Fundamental + Technical Scoring</div>
-          <div class="card-meta" id="meta-nifty">Daily data · 1 year lookback · 60% Fund + 40% Tech</div>
-        </div>
-        <div class="actions">
-          <span class="status-badge status-idle" id="badge-nifty">Idle</span>
-          <button class="btn btn-primary" id="run-nifty" onclick="runScanner('nifty')">
-            <span>&#9654;</span> Run Scanner
-          </button>
-          <a href="/api/download/nifty" class="btn btn-success" id="dl-nifty">
-            <span>&#8595;</span> Download CSV
-          </a>
+          <div class="toolbar-title">Fundamental + Technical Scoring &nbsp;<span class="toolbar-meta" id="meta-fund"></span></div>
         </div>
       </div>
+      <div class="toolbar-right">
+        <span class="status-badge s-idle" id="badge-fund">Idle</span>
+        <button class="btn btn-primary" id="run-fund" onclick="runScanner('fund')">▶ Run Scanner</button>
+        <a href="/api/download/fund" class="btn btn-success">↓ Download CSV</a>
+      </div>
+    </div>
 
-      <div class="filter-row">
-        <span class="filter-label">Filter by Recommendation:</span>
-        <select id="filter-rec" onchange="applyFilters('nifty')">
-          <option value="">All Recommendations</option>
+    <div class="filters-row">
+      <div class="filter-group">
+        <label>Recommendation</label>
+        <select class="filter-sel" id="f-rec" onchange="applyFundFilters()">
+          <option value="">All</option>
           <option value="Buy">Buy</option>
           <option value="Hold">Hold</option>
           <option value="Sell">Sell</option>
         </select>
-        <button class="btn btn-outline" onclick="clearFilters('nifty')">Clear Filters</button>
       </div>
+      <div class="filter-group">
+        <label>Min Fund Score</label>
+        <select class="filter-sel" id="f-fund-min" onchange="applyFundFilters()">
+          <option value="">Any</option>
+          <option value="2">≥ 2</option>
+          <option value="3">≥ 3</option>
+          <option value="4">≥ 4</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Min Final Score</label>
+        <select class="filter-sel" id="f-score-min" onchange="applyFundFilters()">
+          <option value="">Any</option>
+          <option value="0.5">≥ 0.5</option>
+          <option value="0.6">≥ 0.6</option>
+          <option value="0.7">≥ 0.7</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="clearFundFilters()">✕ Clear</button>
+    </div>
 
-      <div class="table-wrap">
-        <div id="empty-nifty" class="empty-state" style="display:none">
-          <div class="icon">📈</div>
-          <p>No scan data yet.</p>
-          <small>Click "Run Scanner" to start. This may take a few minutes to fetch live data.</small>
-        </div>
-        <table id="table-nifty" class="display" style="display:none"></table>
+    <div class="table-card">
+      <div id="empty-fund" class="empty-state" style="display:none">
+        <div class="icon">🏦</div>
+        <p>No scan data yet.</p>
+        <small>Click "Run Scanner" to start. Fetches 1y daily data for ~50 stocks.</small>
+      </div>
+      <div class="table-wrap" id="wrap-fund" style="display:none">
+        <table id="table-fund" class="dt"></table>
       </div>
     </div>
   </div>
 
 </div>
 
+<!-- ===== STOCKS MODAL ===== -->
+<div class="modal-overlay" id="stocks-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">⚙ Manage Stock Universe</div>
+      <button class="modal-close" onclick="closeStocksModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="input-row">
+        <input type="text" id="add-stock-input" placeholder="Enter symbol, e.g. RELIANCE or RELIANCE.NS"
+          onkeydown="if(event.key==='Enter') addStock()"/>
+        <button class="btn btn-primary" onclick="addStock()">Add Stock</button>
+      </div>
+      <div id="add-msg"></div>
+
+      <div class="stocks-list-section">
+        <div class="stocks-list-header">Custom Stocks (<span id="custom-count">0</span>)</div>
+        <div class="stocks-grid" id="custom-chips">
+          <span style="color:var(--muted);font-size:12px">No custom stocks added yet.</span>
+        </div>
+        <div class="stocks-list-header">Default Nifty 100 (<span id="default100-count">0</span>)</div>
+        <div class="stocks-grid" id="default100-chips"></div>
+        <div class="stocks-list-header" style="margin-top:12px">Default Nifty 50 (<span id="default50-count">0</span>)</div>
+        <div class="stocks-grid" id="default50-chips"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeStocksModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
-  let tables = {};
-  let rawData = { main: null, nifty: null };
+// ---- State ----
+let tables = {};
+let rawData = { tech: null, fund: null };
 
-  // ---- Tab switching ----
-  function switchTab(name, btn) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('panel-' + name).classList.add('active');
+// ---- Tabs ----
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+// ---- Badges ----
+function sig(val) {
+  if (!val || val === '---') return `<span class="sig sig-neutral">—</span>`;
+  if (val === 'Buy') return `<span class="sig sig-buy">▲ Buy</span>`;
+  if (val === 'Sell') return `<span class="sig sig-sell">▼ Sell</span>`;
+  if (val === 'Hold') return `<span class="sig sig-hold">● Hold</span>`;
+  return `<span class="sig sig-neutral">${val}</span>`;
+}
+
+function rsiColor(v) {
+  if (!v && v !== 0) return `<span class="rsi-mid">—</span>`;
+  const n = parseFloat(v);
+  if (isNaN(n)) return `<span class="rsi-mid">—</span>`;
+  if (n < 30) return `<span class="rsi-low">${n.toFixed(1)}</span>`;
+  if (n > 70) return `<span class="rsi-high">${n.toFixed(1)}</span>`;
+  if (n >= 40 && n <= 60) return `<span class="rsi-ok">${n.toFixed(1)}</span>`;
+  return `<span class="rsi-mid">${n.toFixed(1)}</span>`;
+}
+
+function pct(v) {
+  if (v === '' || v === null || v === undefined) return '—';
+  const n = parseFloat(v);
+  if (isNaN(n)) return v;
+  const cls = n > 0 ? 'pct-pos' : n < 0 ? 'pct-neg' : 'pct-zero';
+  const arrow = n > 0 ? '↑' : n < 0 ? '↓' : '';
+  return `<span class="${cls}">${arrow}${Math.abs(n).toFixed(2)}%</span>`;
+}
+
+function price(v) {
+  if (v === '' || v === null) return '—';
+  const n = parseFloat(v);
+  return isNaN(n) ? v : `₹${n.toLocaleString('en-IN', {minimumFractionDigits:2,maximumFractionDigits:2})}`;
+}
+
+function scoreBar(val, max) {
+  if (val === '' || val === null) return '—';
+  const n = parseFloat(val);
+  const pct = Math.min(100, (n / max) * 100);
+  let color = pct >= 70 ? '#10b981' : pct >= 45 ? '#f97316' : '#ef4444';
+  return `<div class="score-bar-wrap">
+    <div class="score-bar"><div class="score-fill" style="width:${pct}%;background:${color}"></div></div>
+    <span class="score-label" style="color:${color}">${n.toFixed(1)}</span>
+  </div>`;
+}
+
+function tvLink(url) {
+  if (!url) return '—';
+  return `<a href="${url}" target="_blank" class="tv-link">⎋ Chart</a>`;
+}
+
+function macdHistColor(v) {
+  if (v === '' || v === null) return '—';
+  const n = parseFloat(v);
+  if (isNaN(n)) return v;
+  const cls = n > 0 ? 'pct-pos' : 'pct-neg';
+  return `<span class="${cls}">${n.toFixed(3)}</span>`;
+}
+
+// ---- Build Tech Table ----
+function buildTechTable(rows) {
+  rawData.tech = rows;
+  updateTechStats(rows);
+
+  if (!rows || rows.length === 0) {
+    document.getElementById('empty-tech').style.display = 'block';
+    document.getElementById('wrap-tech').style.display = 'none';
+    return;
   }
+  document.getElementById('empty-tech').style.display = 'none';
+  document.getElementById('wrap-tech').style.display = '';
 
-  // ---- Signal badge renderer ----
-  function signalBadge(val) {
-    if (!val || val === '---') return `<span class="signal-neutral">—</span>`;
-    if (val === 'Buy') return `<span class="signal-buy">Buy</span>`;
-    if (val === 'Sell') return `<span class="signal-sell">Sell</span>`;
-    if (val === 'Hold') return `<span class="signal-hold">Hold</span>`;
-    return `<span class="signal-neutral">${val}</span>`;
+  if (tables.tech) { tables.tech.destroy(); $('#table-tech').empty(); }
+
+  tables.tech = $('#table-tech').DataTable({
+    data: rows,
+    columns: [
+      { title: 'Stock', data: 'Stock', render: (d, _, row) => {
+        const sym = (d || '').replace('.NS','');
+        return `<div class="stock-name">${sym}</div><div class="stock-sub">${d}</div>`;
+      }},
+      { title: '% Change', data: '% Change', render: d => pct(d) },
+      { title: 'Price (₹)', data: 'Price', render: d => price(d) },
+      { title: 'RSI', data: 'RSI', render: d => rsiColor(d) },
+      { title: 'MACD Hist', data: 'MACD Hist', render: d => macdHistColor(d) },
+      { title: 'MACD Signal', data: 'MACD Signal', render: d => sig(d) },
+      { title: 'RSI Signal', data: 'RSI Signal', render: d => sig(d) },
+      { title: 'UT Bot', data: 'UT Bot', render: d => sig(d) },
+      { title: 'Chart', data: 'Chart', render: d => tvLink(d), orderable: false }
+    ],
+    pageLength: 25,
+    lengthMenu: [10, 25, 50, 100],
+    order: [[1, 'desc']],
+    dom: 'Blfrtip',
+    buttons: [{
+      extend: 'csvHtml5', text: '⬇ Export Filtered CSV', className: 'dt-button',
+      filename: 'nifty_signals_filtered', exportOptions: { modifier: { search: 'applied' },
+        columns: [0,1,2,3,4,5,6,7] }
+    }],
+    scrollX: true,
+    language: { search: '🔍 Search:', emptyTable: 'No matching stocks.' }
+  });
+}
+
+function updateTechStats(rows) {
+  if (!rows || !rows.length) return;
+  document.getElementById('st-total').textContent = rows.length;
+  document.getElementById('st-macd-buy').textContent = rows.filter(r => r['MACD Signal'] === 'Buy').length;
+  document.getElementById('st-rsi-buy').textContent = rows.filter(r => r['RSI Signal'] === 'Buy').length;
+  document.getElementById('st-ut-buy').textContent = rows.filter(r => r['UT Bot'] === 'Buy').length;
+  document.getElementById('st-macd-sell').textContent = rows.filter(r => r['MACD Signal'] === 'Sell').length;
+  document.getElementById('st-rsi-sell').textContent = rows.filter(r => r['RSI Signal'] === 'Sell').length;
+}
+
+// ---- Build Fund Table ----
+function buildFundTable(rows) {
+  rawData.fund = rows;
+  updateFundStats(rows);
+
+  if (!rows || rows.length === 0) {
+    document.getElementById('empty-fund').style.display = 'block';
+    document.getElementById('wrap-fund').style.display = 'none';
+    return;
   }
+  document.getElementById('empty-fund').style.display = 'none';
+  document.getElementById('wrap-fund').style.display = '';
 
-  function fmtNum(val, decimals) {
-    if (val === '' || val === null || val === undefined) return '—';
-    const n = parseFloat(val);
-    if (isNaN(n)) return val;
-    return n.toFixed(decimals);
-  }
+  if (tables.fund) { tables.fund.destroy(); $('#table-fund').empty(); }
 
-  function fmtPct(val) {
-    if (val === '' || val === null || val === undefined) return '—';
-    const n = parseFloat(val);
-    if (isNaN(n)) return val;
-    const cls = n >= 0 ? 'pct-pos' : 'pct-neg';
-    return `<span class="${cls}">${n >= 0 ? '+' : ''}${n.toFixed(2)}%</span>`;
-  }
+  tables.fund = $('#table-fund').DataTable({
+    data: rows,
+    columns: [
+      { title: 'Symbol', data: 'Symbol', render: (d) => {
+        const sym = (d||'').replace('.NS','');
+        return `<div class="stock-name">${sym}</div><div class="stock-sub">${d}</div>`;
+      }},
+      { title: 'Price (₹)', data: 'Price', render: d => price(d) },
+      { title: 'P/E', data: 'P/E', render: d => (d===''||d==null)?'—':parseFloat(d).toFixed(1) },
+      { title: 'D/E', data: 'D/E', render: d => (d===''||d==null)?'—':parseFloat(d).toFixed(1) },
+      { title: 'ROE %', data: 'ROE', render: d => {
+        if (d===''||d==null) return '—';
+        const n=parseFloat(d);
+        const cls = n>=15?'pct-pos':n>=8?'':'pct-neg';
+        return `<span class="${cls}">${n.toFixed(1)}%</span>`;
+      }},
+      { title: 'RSI', data: 'RSI', render: d => rsiColor(d) },
+      { title: 'Fund Score', data: 'Fund Score', render: d => scoreBar(d, 5) },
+      { title: 'Tech Score', data: 'Tech Score', render: d => scoreBar(d, 5) },
+      { title: 'Final Score', data: 'Final Score', render: d => scoreBar(d, 1) },
+      { title: 'Action', data: 'Recommendation', render: d => sig(d) },
+      { title: 'Chart', data: 'Chart', render: d => tvLink(d), orderable: false }
+    ],
+    pageLength: 25,
+    lengthMenu: [10, 25, 50, 100],
+    order: [[8, 'desc']],
+    dom: 'Blfrtip',
+    buttons: [{
+      extend: 'csvHtml5', text: '⬇ Export Filtered CSV', className: 'dt-button',
+      filename: 'nifty_fund_filtered', exportOptions: { modifier: { search: 'applied' },
+        columns: [0,1,2,3,4,5,6,7,8,9] }
+    }],
+    scrollX: true,
+    language: { search: '🔍 Search:', emptyTable: 'No matching stocks.' }
+  });
+}
 
-  // ---- Build main table ----
-  function buildMainTable(data) {
-    rawData.main = data;
-    const { columns, rows, generated_at } = data;
+function updateFundStats(rows) {
+  if (!rows || !rows.length) return;
+  document.getElementById('sf-total').textContent = rows.length;
+  document.getElementById('sf-buy').textContent = rows.filter(r => r['Recommendation'] === 'Buy').length;
+  document.getElementById('sf-hold').textContent = rows.filter(r => r['Recommendation'] === 'Hold').length;
+  document.getElementById('sf-sell').textContent = rows.filter(r => r['Recommendation'] === 'Sell').length;
+  const avgFund = rows.reduce((s,r) => s + (parseFloat(r['Fund Score'])||0), 0) / rows.length;
+  const avgTech = rows.reduce((s,r) => s + (parseFloat(r['Tech Score'])||0), 0) / rows.length;
+  document.getElementById('sf-avg-fund').textContent = avgFund.toFixed(1);
+  document.getElementById('sf-avg-tech').textContent = avgTech.toFixed(1);
+}
 
-    if (!rows || rows.length === 0) {
-      document.getElementById('empty-main').style.display = 'block';
-      document.getElementById('table-main').style.display = 'none';
-      return;
-    }
+// ---- Filters ----
+function applyTechFilters() {
+  if (!tables.tech || !rawData.tech) return;
+  let rows = rawData.tech;
+  const macd = document.getElementById('f-macd').value;
+  const rsi = document.getElementById('f-rsi').value;
+  const ut = document.getElementById('f-ut').value;
+  const rsiRange = document.getElementById('f-rsi-range').value;
+  const pctF = document.getElementById('f-pct').value;
 
-    document.getElementById('empty-main').style.display = 'none';
-    document.getElementById('table-main').style.display = '';
-
-    if (generated_at) {
-      document.getElementById('meta-main').textContent = `Weekly data · Last scan: ${generated_at}`;
-    }
-
-    // Build column defs
-    const colDefs = columns.map((col, idx) => {
-      if (col === 'TradingView Link' || col === 'tradingview') {
-        return {
-          title: 'Chart', targets: idx,
-          render: (d) => d ? `<a href="${d}" target="_blank" class="tv-link">&#128279; View</a>` : '—'
-        };
-      }
-      if (['MACD Signal', 'RSI Signal', 'UT Bot Signal', 'recommendation'].includes(col)) {
-        return { title: col, targets: idx, render: (d) => signalBadge(d) };
-      }
-      if (col === 'Last Day % Movement') {
-        return { title: '% Move', targets: idx, render: (d) => fmtPct(d) };
-      }
-      if (col === 'Current Price' || col === 'current_price') {
-        return { title: 'Price', targets: idx, render: (d) => fmtNum(d, 2) };
-      }
-      if (col.startsWith('MACD_')) {
-        return { title: col, targets: idx, render: (d) => fmtNum(d, 3) };
-      }
-      if (col.startsWith('RSI_')) {
-        return { title: col, targets: idx, render: (d) => fmtNum(d, 1) };
-      }
-      if (col.startsWith('TrailingStop_')) {
-        return { title: col, targets: idx, render: (d) => fmtNum(d, 2) };
-      }
-      return { title: col, targets: idx };
+  if (macd) rows = rows.filter(r => r['MACD Signal'] === macd);
+  if (rsi) rows = rows.filter(r => r['RSI Signal'] === rsi);
+  if (ut) rows = rows.filter(r => r['UT Bot'] === ut);
+  if (rsiRange) {
+    rows = rows.filter(r => {
+      const v = parseFloat(r['RSI']);
+      if (isNaN(v)) return false;
+      if (rsiRange === 'oversold') return v < 30;
+      if (rsiRange === 'healthy') return v >= 30 && v <= 70;
+      if (rsiRange === 'overbought') return v > 70;
+      return true;
     });
-
-    if (tables['main']) { tables['main'].destroy(); $('#table-main').empty(); }
-
-    tables['main'] = $('#table-main').DataTable({
-      data: rows,
-      columns: columns.map(c => ({ title: c })),
-      columnDefs: colDefs,
-      pageLength: 25,
-      lengthMenu: [10, 25, 50, 100],
-      order: [[0, 'asc']],
-      dom: 'Blfrtip',
-      buttons: [
-        {
-          extend: 'csvHtml5',
-          text: '&#8595; Export Filtered CSV',
-          className: 'dt-button',
-          filename: 'nifty100_signals_filtered',
-          exportOptions: { modifier: { search: 'applied' } }
-        }
-      ],
-      scrollX: true,
-      language: { search: 'Quick search:', emptyTable: 'No data available.' }
+  }
+  if (pctF) {
+    rows = rows.filter(r => {
+      const v = parseFloat(r['% Change']);
+      if (isNaN(v)) return false;
+      if (pctF === 'up') return v > 0;
+      if (pctF === 'down') return v < 0;
+      if (pctF === 'up2') return v > 2;
+      return true;
     });
   }
+  tables.tech.clear().rows.add(rows).draw();
+  updateTechStats(rows);
+}
 
-  // ---- Build nifty table ----
-  function buildNiftyTable(data) {
-    rawData.nifty = data;
-    const { columns, rows, generated_at } = data;
+function clearTechFilters() {
+  ['f-macd','f-rsi','f-ut','f-rsi-range','f-pct'].forEach(id => document.getElementById(id).value = '');
+  if (tables.tech && rawData.tech) { tables.tech.clear().rows.add(rawData.tech).draw(); updateTechStats(rawData.tech); }
+}
 
-    if (!rows || rows.length === 0) {
-      document.getElementById('empty-nifty').style.display = 'block';
-      document.getElementById('table-nifty').style.display = 'none';
-      return;
-    }
+function applyFundFilters() {
+  if (!tables.fund || !rawData.fund) return;
+  let rows = rawData.fund;
+  const rec = document.getElementById('f-rec').value;
+  const fundMin = document.getElementById('f-fund-min').value;
+  const scoreMin = document.getElementById('f-score-min').value;
 
-    document.getElementById('empty-nifty').style.display = 'none';
-    document.getElementById('table-nifty').style.display = '';
+  if (rec) rows = rows.filter(r => r['Recommendation'] === rec);
+  if (fundMin) rows = rows.filter(r => parseFloat(r['Fund Score']) >= parseFloat(fundMin));
+  if (scoreMin) rows = rows.filter(r => parseFloat(r['Final Score']) >= parseFloat(scoreMin));
 
-    if (generated_at) {
-      document.getElementById('meta-nifty').textContent =
-        `Daily data · 60% Fund + 40% Tech · Last scan: ${generated_at}`;
-    }
+  tables.fund.clear().rows.add(rows).draw();
+  updateFundStats(rows);
+}
 
-    const colDefs = columns.map((col, idx) => {
-      if (col === 'tradingview') {
-        return {
-          title: 'Chart', targets: idx,
-          render: (d) => d ? `<a href="${d}" target="_blank" class="tv-link">&#128279; View</a>` : '—'
-        };
+function clearFundFilters() {
+  ['f-rec','f-fund-min','f-score-min'].forEach(id => document.getElementById(id).value = '');
+  if (tables.fund && rawData.fund) { tables.fund.clear().rows.add(rawData.fund).draw(); updateFundStats(rawData.fund); }
+}
+
+// ---- Scanner control ----
+function runScanner(name) {
+  setBadge(name, 'running');
+  document.getElementById('run-' + name).disabled = true;
+  fetch('/api/run/' + name, {method:'POST'})
+    .then(r => r.json())
+    .then(() => pollStatus(name));
+}
+
+function pollStatus(name) {
+  fetch('/api/status/' + name)
+    .then(r => r.json())
+    .then(d => {
+      const s = d.status;
+      const isErr = s.startsWith('error');
+      setBadge(name, isErr ? 'error' : s);
+      if (s === 'running') {
+        setTimeout(() => pollStatus(name), 3000);
+      } else {
+        document.getElementById('run-' + name).disabled = false;
+        if (s === 'done') loadData(name);
       }
-      if (col === 'recommendation') {
-        return { title: 'Recommendation', targets: idx, render: (d) => signalBadge(d) };
-      }
-      if (col === 'current_price') {
-        return { title: 'Price', targets: idx, render: (d) => fmtNum(d, 2) };
-      }
-      if (col === 'final_score') {
-        return { title: 'Final Score', targets: idx, render: (d) => fmtNum(d, 3) };
-      }
-      return { title: col, targets: idx };
     });
+}
 
-    if (tables['nifty']) { tables['nifty'].destroy(); $('#table-nifty').empty(); }
+function setBadge(name, status) {
+  const el = document.getElementById('badge-' + name);
+  el.className = 'status-badge';
+  if (status === 'running') {
+    el.classList.add('s-running');
+    el.innerHTML = '<div class="spinner"></div> Running…';
+  } else if (status === 'done') {
+    el.classList.add('s-done');
+    el.innerHTML = '✓ Done';
+  } else if (status === 'error') {
+    el.classList.add('s-error');
+    el.innerHTML = '✕ Error';
+  } else {
+    el.classList.add('s-idle');
+    el.innerHTML = 'Idle';
+  }
+}
 
-    tables['nifty'] = $('#table-nifty').DataTable({
-      data: rows,
-      columns: columns.map(c => ({ title: c })),
-      columnDefs: colDefs,
-      pageLength: 25,
-      lengthMenu: [10, 25, 50, 100],
-      order: [[columns.indexOf('final_score') >= 0 ? columns.indexOf('final_score') : 0, 'desc']],
-      dom: 'Blfrtip',
-      buttons: [
-        {
-          extend: 'csvHtml5',
-          text: '&#8595; Export Filtered CSV',
-          className: 'dt-button',
-          filename: 'nifty50_scan_filtered',
-          exportOptions: { modifier: { search: 'applied' } }
-        }
-      ],
-      scrollX: true,
-      language: { search: 'Quick search:', emptyTable: 'No data available.' }
+function loadData(name) {
+  const endpoint = name === 'tech' ? '/api/data/tech' : '/api/data/fund';
+  fetch(endpoint)
+    .then(r => r.json())
+    .then(d => {
+      const metaEl = document.getElementById('meta-' + name);
+      if (d.generated_at && metaEl) metaEl.textContent = `Last scan: ${d.generated_at}`;
+      if (name === 'tech') buildTechTable(d.rows);
+      else buildFundTable(d.rows);
     });
+}
+
+// ---- Stocks modal ----
+function openStocksModal() {
+  document.getElementById('stocks-modal').classList.add('open');
+  loadStocksList();
+}
+
+function closeStocksModal() {
+  document.getElementById('stocks-modal').classList.remove('open');
+  document.getElementById('add-msg').innerHTML = '';
+  document.getElementById('add-stock-input').value = '';
+}
+
+function loadStocksList() {
+  fetch('/api/stocks')
+    .then(r => r.json())
+    .then(d => renderStocksList(d));
+}
+
+function renderStocksList(d) {
+  const customChips = document.getElementById('custom-chips');
+  const def100 = document.getElementById('default100-chips');
+  const def50 = document.getElementById('default50-chips');
+  document.getElementById('custom-count').textContent = d.custom.length;
+  document.getElementById('default100-count').textContent = d.default_tech.length;
+  document.getElementById('default50-count').textContent = d.default_fund.length;
+
+  if (d.custom.length === 0) {
+    customChips.innerHTML = '<span style="color:var(--muted);font-size:12px">No custom stocks added yet.</span>';
+  } else {
+    customChips.innerHTML = d.custom.map(s => {
+      const sym = s.replace('.NS','');
+      return `<span class="stock-chip custom">${sym}
+        <button class="chip-remove" title="Remove" onclick="removeStock('${s}')">✕</button>
+      </span>`;
+    }).join('');
   }
+  def100.innerHTML = d.default_tech.map(s =>
+    `<span class="stock-chip">${s.replace('.NS','')}</span>`
+  ).join('');
+  def50.innerHTML = d.default_fund.map(s =>
+    `<span class="stock-chip">${s.replace('.NS','')}</span>`
+  ).join('');
+}
 
-  // ---- Apply custom column filters ----
-  function applyFilters(tab) {
-    if (tab === 'main' && tables['main']) {
-      const data = rawData.main;
-      const cols = data.columns;
-      const macdVal = document.getElementById('filter-macd').value;
-      const rsiVal = document.getElementById('filter-rsi').value;
-      const utVal = document.getElementById('filter-utbot').value;
-
-      const macdIdx = cols.indexOf('MACD Signal');
-      const rsiIdx = cols.indexOf('RSI Signal');
-      const utIdx = cols.indexOf('UT Bot Signal');
-
-      let filtered = data.rows;
-      if (macdVal && macdIdx >= 0) filtered = filtered.filter(r => String(r[macdIdx]) === macdVal);
-      if (rsiVal && rsiIdx >= 0) filtered = filtered.filter(r => String(r[rsiIdx]) === rsiVal);
-      if (utVal && utIdx >= 0) filtered = filtered.filter(r => String(r[utIdx]) === utVal);
-
-      tables['main'].clear().rows.add(filtered).draw();
-    }
-
-    if (tab === 'nifty' && tables['nifty']) {
-      const data = rawData.nifty;
-      const cols = data.columns;
-      const recVal = document.getElementById('filter-rec').value;
-      const recIdx = cols.indexOf('recommendation');
-
-      let filtered = data.rows;
-      if (recVal && recIdx >= 0) filtered = filtered.filter(r => String(r[recIdx]) === recVal);
-
-      tables['nifty'].clear().rows.add(filtered).draw();
-    }
-  }
-
-  function clearFilters(tab) {
-    if (tab === 'main') {
-      document.getElementById('filter-macd').value = '';
-      document.getElementById('filter-rsi').value = '';
-      document.getElementById('filter-utbot').value = '';
-      if (tables['main'] && rawData.main) {
-        tables['main'].clear().rows.add(rawData.main.rows).draw();
-      }
-    }
-    if (tab === 'nifty') {
-      document.getElementById('filter-rec').value = '';
-      if (tables['nifty'] && rawData.nifty) {
-        tables['nifty'].clear().rows.add(rawData.nifty.rows).draw();
-      }
-    }
-  }
-
-  // ---- Run scanner ----
-  function runScanner(name) {
-    setBadge(name, 'running');
-    document.getElementById('run-' + name).disabled = true;
-    fetch('/api/run/' + name, { method: 'POST' })
-      .then(r => r.json())
-      .then(() => pollStatus(name));
-  }
-
-  function pollStatus(name) {
-    fetch('/api/status/' + name)
-      .then(r => r.json())
-      .then(d => {
-        const s = d.status;
-        setBadge(name, s.startsWith('error') ? 'error' : s);
-        if (s === 'running') {
-          setTimeout(() => pollStatus(name), 3000);
-        } else if (s === 'done') {
-          document.getElementById('run-' + name).disabled = false;
-          loadData(name);
-        } else if (s.startsWith('error')) {
-          document.getElementById('run-' + name).disabled = false;
-        }
-      });
-  }
-
-  function setBadge(name, status) {
-    const el = document.getElementById('badge-' + name);
-    el.className = 'status-badge';
-    if (status === 'running') {
-      el.classList.add('status-running');
-      el.innerHTML = '<div class="spinner"></div> Running…';
-    } else if (status === 'done') {
-      el.classList.add('status-done');
-      el.innerHTML = '&#10003; Done';
-    } else if (status === 'error' || status.startsWith('error')) {
-      el.classList.add('status-error');
-      el.innerHTML = '&#10007; Error';
+function addStock() {
+  const sym = document.getElementById('add-stock-input').value.trim();
+  if (!sym) return;
+  const msgEl = document.getElementById('add-msg');
+  msgEl.innerHTML = '<span style="color:var(--muted);font-size:12px">Validating…</span>';
+  fetch('/api/stocks', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({symbol: sym})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      msgEl.innerHTML = `<div class="msg msg-success">✓ ${d.symbol} added to custom list.</div>`;
+      document.getElementById('add-stock-input').value = '';
+      loadStocksList();
+      setTimeout(() => msgEl.innerHTML = '', 3000);
     } else {
-      el.classList.add('status-idle');
-      el.innerHTML = 'Idle';
+      msgEl.innerHTML = `<div class="msg msg-error">✕ ${d.error || 'Failed to add.'}</div>`;
     }
-  }
+  })
+  .catch(() => {
+    msgEl.innerHTML = `<div class="msg msg-error">✕ Network error.</div>`;
+  });
+}
 
-  // ---- Load data from server ----
-  function loadData(name) {
-    fetch('/api/data/' + name)
-      .then(r => r.json())
-      .then(data => {
-        if (name === 'main') buildMainTable(data);
-        else buildNiftyTable(data);
-      });
-  }
+function removeStock(symbol) {
+  fetch(`/api/stocks/${encodeURIComponent(symbol)}`, {method:'DELETE'})
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) loadStocksList();
+    });
+}
 
-  // ---- Init ----
-  loadData('main');
-  loadData('nifty');
+// Close modal on overlay click
+document.getElementById('stocks-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeStocksModal();
+});
+
+// ---- Init ----
+loadData('tech');
+loadData('fund');
 </script>
 </body>
 </html>
