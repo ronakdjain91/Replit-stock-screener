@@ -41,6 +41,10 @@ DEFAULT_NIFTY50 = [
     "UPL.NS", "HINDALCO.NS"
 ]
 
+VALID_PERIODS = {"3mo", "6mo", "1y", "2y", "5y"}
+VALID_INTERVALS_TECH = {"1d", "1wk", "1mo"}
+VALID_INTERVALS_FUND = {"1d", "1wk"}
+
 
 def generate_tv_link(symbol):
     sym = symbol.replace(".NS", "")
@@ -87,21 +91,30 @@ def signal_rsi(df):
     return '---'
 
 
-def run_technical_scan(stocks):
+def run_technical_scan(stocks, period='1y', interval='1wk'):
+    if period not in VALID_PERIODS:
+        period = '1y'
+    if interval not in VALID_INTERVALS_TECH:
+        interval = '1wk'
+
     results = []
     for stock in stocks:
         try:
-            df = yf.download(stock, period='1y', progress=False, interval='1wk', auto_adjust=False)
+            df = yf.download(stock, period=period, progress=False, interval=interval, auto_adjust=False)
             if df.empty:
                 continue
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns.get_level_values(0)]
             if 'Close' not in df.columns:
                 continue
+            if len(df) < 3:
+                continue
+
             macd = df.ta.macd()
             rsi = df.ta.rsi(length=14)
             trailing_stop, buy, sell = calculate_ut_bot(df)
             df = pd.concat([df, macd, rsi, trailing_stop.rename('TrailingStop')], axis=1)
+
             macd_sig = signal_macd(df)
             rsi_sig = signal_rsi(df)
             ut_sig = 'Buy' if buy.iloc[-1] else ('Sell' if sell.iloc[-1] else '---')
@@ -113,9 +126,6 @@ def run_technical_scan(stocks):
             rsi_val = float(df['RSI_14'].iloc[-1]) if 'RSI_14' in df.columns else None
             macd_hist = float(df['MACDh_12_26_9'].iloc[-1]) if 'MACDh_12_26_9' in df.columns else None
 
-            rsi_sparkline = [round(float(v), 1) for v in df['RSI_14'].iloc[-7:].tolist()] if 'RSI_14' in df.columns else []
-            macd_sparkline = [round(float(v), 3) for v in df['MACDh_12_26_9'].iloc[-7:].tolist()] if 'MACDh_12_26_9' in df.columns else []
-
             results.append({
                 'Stock': stock,
                 'Price': round(price, 2),
@@ -126,8 +136,6 @@ def run_technical_scan(stocks):
                 'RSI Signal': rsi_sig,
                 'UT Bot': ut_sig,
                 'Chart': generate_tv_link(stock),
-                '_rsi_spark': rsi_sparkline,
-                '_macd_spark': macd_sparkline
             })
         except Exception as e:
             print(f"Error {stock}: {e}")
@@ -136,6 +144,7 @@ def run_technical_scan(stocks):
 
 def _sma(series, w):
     return series.rolling(window=w, min_periods=1).mean()
+
 
 def _rsi(series, w=14):
     delta = series.diff()
@@ -146,12 +155,14 @@ def _rsi(series, w=14):
     rs = ag / (al.replace(0, np.nan))
     return (100 - (100 / (1 + rs))).fillna(50)
 
+
 def _macd(series, fast=12, slow=26, signal=9):
     ef = series.ewm(span=fast, adjust=False).mean()
     es = series.ewm(span=slow, adjust=False).mean()
     ml = ef - es
     sl = ml.ewm(span=signal, adjust=False).mean()
     return ml, sl, ml - sl
+
 
 def _fund_score(ticker_obj):
     info = ticker_obj.info if hasattr(ticker_obj, 'info') else {}
@@ -184,13 +195,19 @@ def _fund_score(ticker_obj):
         pass
     return round(score, 2), {"pe": pe, "de": dte, "roe": roe}
 
-def run_fundamental_scan(stocks):
+
+def run_fundamental_scan(stocks, period='1y', interval='1d'):
+    if period not in VALID_PERIODS:
+        period = '1y'
+    if interval not in VALID_INTERVALS_FUND:
+        interval = '1d'
+
     results = []
     for sym in stocks:
         try:
             tk = yf.Ticker(sym)
-            hist = tk.history(period='1y', interval='1d', actions=False)
-            if hist is None or hist.empty:
+            hist = tk.history(period=period, interval=interval, actions=False)
+            if hist is None or hist.empty or len(hist) < 10:
                 continue
             close = hist['Close']
             s50 = _sma(close, 50)
