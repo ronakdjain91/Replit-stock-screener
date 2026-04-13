@@ -1,13 +1,15 @@
 import os
 import io
+import math
 import json
 import threading
 import pandas as pd
-from flask import Flask, render_template, jsonify, send_file, request
+from flask import Flask, render_template, jsonify, send_file, request, Response
 from datetime import datetime
 from scanner import (
     DEFAULT_NIFTY100, DEFAULT_NIFTY50,
-    run_technical_scan, run_fundamental_scan
+    run_technical_scan, run_fundamental_scan,
+    safe_float
 )
 
 app = Flask(__name__)
@@ -24,10 +26,36 @@ scan_params = {
 }
 
 
+# ── JSON sanitizer ──────────────────────────────────────────────────────────
+def _clean_value(v):
+    """Convert NaN/Inf floats to None so they become JSON null."""
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        return None
+    return v
+
+
+def clean_rows(rows):
+    """Recursively sanitize a list of dicts for safe JSON encoding."""
+    cleaned = []
+    for row in rows:
+        cleaned.append({k: _clean_value(v) for k, v in row.items()})
+    return cleaned
+
+
+def safe_jsonify(payload):
+    """jsonify wrapper that replaces NaN/Inf with null."""
+    text = json.dumps(payload, default=lambda v: None if isinstance(v, float) and (math.isnan(v) or math.isinf(v)) else v)
+    return Response(text, mimetype='application/json')
+
+
+# ── Stock management ─────────────────────────────────────────────────────────
 def load_custom_stocks():
     if os.path.exists(CUSTOM_STOCKS_FILE):
-        with open(CUSTOM_STOCKS_FILE) as f:
-            return json.load(f)
+        try:
+            with open(CUSTOM_STOCKS_FILE) as f:
+                return json.load(f)
+        except Exception:
+            return []
     return []
 
 
@@ -46,18 +74,20 @@ def get_fund_stocks():
     return list(dict.fromkeys(DEFAULT_NIFTY50 + custom))
 
 
+# ── Background scan threads ──────────────────────────────────────────────────
 def do_tech_scan(period, interval):
     scan_status["tech"] = "running"
     scan_params["tech"] = {"period": period, "interval": interval}
     try:
         stocks = get_tech_stocks()
         results = run_technical_scan(stocks, period=period, interval=interval)
-        df = pd.DataFrame(results)
-        if not df.empty:
+        if results:
+            df = pd.DataFrame(results)
             df.to_csv(TECH_CSV, index=False)
-        scan_results["tech"] = results
+        scan_results["tech"] = clean_rows(results)
         scan_status["tech"] = "done"
     except Exception as e:
+        print(f"[do_tech_scan] {e}")
         scan_status["tech"] = f"error:{e}"
 
 
@@ -67,53 +97,87 @@ def do_fund_scan(period, interval):
     try:
         stocks = get_fund_stocks()
         results = run_fundamental_scan(stocks, period=period, interval=interval)
-        df = pd.DataFrame(results)
-        if not df.empty:
+        if results:
+            df = pd.DataFrame(results)
             df = df.sort_values("Final Score", ascending=False)
             df.to_csv(FUND_CSV, index=False)
-        scan_results["fund"] = results
+        scan_results["fund"] = clean_rows(results)
         scan_status["fund"] = "done"
     except Exception as e:
+        print(f"[do_fund_scan] {e}")
         scan_status["fund"] = f"error:{e}"
+
+
+# ── CSV loaders ──────────────────────────────────────────────────────────────
+def _float_or_none(v):
+    """Parse a value from a CSV cell; return None if missing/NaN."""
+    if v is None or v == '' or (isinstance(v, float) and math.isnan(v)):
+        return None
+    return safe_float(v)
 
 
 def load_tech_csv():
     if not os.path.exists(TECH_CSV):
         return []
-    df = pd.read_csv(TECH_CSV)
-    df = df.drop(columns=[c for c in df.columns if c.startswith('_')], errors='ignore')
-    df = df.fillna('')
-    clean = []
-    for r in df.to_dict(orient='records'):
+    try:
+        df = pd.read_csv(TECH_CSV, dtype=str)   # read everything as string first
+    except Exception:
+        return []
+    rows = []
+    for _, r in df.iterrows():
         stock = r.get('Stock', '')
-        price = r.get('Price', r.get('Current Price', ''))
-        pct = r.get('% Change', r.get('Last Day % Movement', ''))
-        rsi = r.get('RSI', r.get('RSI_1', ''))
-        macd_h = r.get('MACD Hist', r.get('MACD_1', ''))
-        clean.append({
-            'Stock': stock,
-            'Price': round(float(price), 2) if price != '' else '',
-            '% Change': round(float(pct), 2) if pct != '' else '',
-            'RSI': round(float(rsi), 1) if rsi != '' else '',
-            'MACD Hist': round(float(macd_h), 3) if macd_h != '' else '',
-            'MACD Signal': r.get('MACD Signal', '---'),
-            'RSI Signal': r.get('RSI Signal', '---'),
-            'UT Bot': r.get('UT Bot', r.get('UT Bot Signal', '---')),
-            'Chart': r.get('Chart', r.get('TradingView Link', ''))
+        if not stock:
+            continue
+
+        price = _float_or_none(r.get('Price', ''))
+        pct   = _float_or_none(r.get('% Change', ''))
+        rsi   = _float_or_none(r.get('RSI', ''))
+        macdh = _float_or_none(r.get('MACD Hist', ''))
+
+        rows.append({
+            'Stock':       str(stock),
+            'Price':       round(price, 2)  if price is not None else None,
+            '% Change':    round(pct, 2)    if pct   is not None else None,
+            'RSI':         round(rsi, 1)    if rsi   is not None else None,
+            'MACD Hist':   round(macdh, 3)  if macdh is not None else None,
+            'MACD Signal': str(r.get('MACD Signal', '---') or '---'),
+            'RSI Signal':  str(r.get('RSI Signal',  '---') or '---'),
+            'UT Bot':      str(r.get('UT Bot',       '---') or '---'),
+            'Chart':       str(r.get('Chart', '') or ''),
         })
-    return clean
+    return rows
 
 
 def load_fund_csv():
     if not os.path.exists(FUND_CSV):
         return []
-    df = pd.read_csv(FUND_CSV)
-    df = df.fillna('')
-    return df.to_dict(orient='records')
+    try:
+        df = pd.read_csv(FUND_CSV, dtype=str)
+    except Exception:
+        return []
+    rows = []
+    for _, r in df.iterrows():
+        sym = r.get('Symbol', '')
+        if not sym:
+            continue
+        rows.append({
+            'Symbol':         str(sym),
+            'Price':          _float_or_none(r.get('Price', '')),
+            'P/E':            _float_or_none(r.get('P/E', '')),
+            'D/E':            _float_or_none(r.get('D/E', '')),
+            'ROE':            _float_or_none(r.get('ROE', '')),
+            'RSI':            _float_or_none(r.get('RSI', '')),
+            'Fund Score':     _float_or_none(r.get('Fund Score', '')),
+            'Tech Score':     _float_or_none(r.get('Tech Score', '')),
+            'Final Score':    _float_or_none(r.get('Final Score', '')),
+            'Recommendation': str(r.get('Recommendation', '---') or '---'),
+            'Chart':          str(r.get('Chart', '') or ''),
+        })
+    return rows
 
 
 def normalize_symbol(raw):
-    sym = raw.strip().upper().replace(" ", "")
+    sym = str(raw).strip().upper().replace(" ", "")
     if not sym:
         return None
     if not sym.endswith(".NS"):
@@ -121,6 +185,7 @@ def normalize_symbol(raw):
     return sym
 
 
+# ── Routes ───────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -129,11 +194,9 @@ def index():
 @app.route("/api/data/tech")
 def data_tech():
     rows = scan_results["tech"] if scan_results["tech"] is not None else load_tech_csv()
-    if rows:
-        rows = [{k: v for k, v in r.items() if not str(k).startswith('_')} for r in rows]
     mtime = os.path.getmtime(TECH_CSV) if os.path.exists(TECH_CSV) else None
     generated_at = datetime.fromtimestamp(mtime).strftime("%d %b %Y, %H:%M") if mtime else None
-    return jsonify({
+    return safe_jsonify({
         "rows": rows or [],
         "generated_at": generated_at,
         "params": scan_params["tech"]
@@ -145,7 +208,7 @@ def data_fund():
     rows = scan_results["fund"] if scan_results["fund"] is not None else load_fund_csv()
     mtime = os.path.getmtime(FUND_CSV) if os.path.exists(FUND_CSV) else None
     generated_at = datetime.fromtimestamp(mtime).strftime("%d %b %Y, %H:%M") if mtime else None
-    return jsonify({
+    return safe_jsonify({
         "rows": rows or [],
         "generated_at": generated_at,
         "params": scan_params["fund"]
@@ -155,17 +218,15 @@ def data_fund():
 @app.route("/api/run/<scanner>", methods=["POST"])
 def run_scanner(scanner):
     body = request.get_json(silent=True) or {}
-    period = body.get("period", "1y")
+    period   = body.get("period", "1y")
     interval = body.get("interval", "1wk" if scanner == "tech" else "1d")
 
     if scanner == "tech" and scan_status["tech"] != "running":
-        t = threading.Thread(target=do_tech_scan, args=(period, interval))
-        t.daemon = True
+        t = threading.Thread(target=do_tech_scan, args=(period, interval), daemon=True)
         t.start()
         return jsonify({"status": "started"})
     elif scanner == "fund" and scan_status["fund"] != "running":
-        t = threading.Thread(target=do_fund_scan, args=(period, interval))
-        t.daemon = True
+        t = threading.Thread(target=do_fund_scan, args=(period, interval), daemon=True)
         t.start()
         return jsonify({"status": "started"})
     return jsonify({"status": scan_status.get(scanner, "unknown")})
@@ -188,7 +249,7 @@ def list_stocks():
 
 @app.route("/api/stocks", methods=["POST"])
 def add_stock():
-    body = request.get_json()
+    body = request.get_json(silent=True) or {}
     symbol = normalize_symbol(body.get("symbol", ""))
     if not symbol:
         return jsonify({"error": "Symbol required"}), 400
@@ -207,14 +268,12 @@ def upload_stocks():
     f = request.files['file']
     if not f.filename.lower().endswith('.csv'):
         return jsonify({"error": "Only CSV files are supported"}), 400
-
     try:
         content = f.read().decode('utf-8', errors='replace')
         df = pd.read_csv(io.StringIO(content))
     except Exception as e:
-        return jsonify({"error": f"Could not parse CSV: {str(e)}"}), 400
+        return jsonify({"error": f"Could not parse CSV: {e}"}), 400
 
-    # Find the column most likely to contain symbols
     symbol_col = None
     priority = ['symbol', 'stock', 'ticker', 'scrip', 'name', 'code']
     lower_cols = {c.lower(): c for c in df.columns}
@@ -234,10 +293,11 @@ def upload_stocks():
         sym = normalize_symbol(raw)
         if not sym:
             continue
-        if sym in all_known or sym in [normalize_symbol(c) for c in custom]:
-            skipped.append(sym)
-        elif len(sym) > 20 or not sym.replace('.NS','').replace('-','').replace('&','').isalnum():
+        base = sym.replace('.NS', '').replace('-', '').replace('&', '')
+        if not base.isalnum() or len(sym) > 24:
             invalid.append(sym)
+        elif sym in all_known:
+            skipped.append(sym)
         else:
             if sym not in custom:
                 custom.append(sym)
@@ -247,11 +307,8 @@ def upload_stocks():
 
     save_custom_stocks(custom)
     return jsonify({
-        "success": True,
-        "added": added,
-        "skipped": skipped,
-        "invalid": invalid,
-        "total_custom": len(custom)
+        "success": True, "added": added, "skipped": skipped,
+        "invalid": invalid, "total_custom": len(custom)
     })
 
 

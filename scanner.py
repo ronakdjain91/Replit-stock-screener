@@ -1,8 +1,8 @@
+import math
 import pandas as pd
 import numpy as np
 import pandas_ta as ta
 import yfinance as yf
-from datetime import datetime, timedelta
 
 
 DEFAULT_NIFTY100 = [
@@ -46,6 +46,27 @@ VALID_INTERVALS_TECH = {"1d", "1wk", "1mo"}
 VALID_INTERVALS_FUND = {"1d", "1wk"}
 
 
+def safe_float(v, ndigits=None):
+    """Convert to float; return None if NaN, Inf or unconvertible."""
+    try:
+        f = float(v)
+        if math.isnan(f) or math.isinf(f):
+            return None
+        return round(f, ndigits) if ndigits is not None else f
+    except (TypeError, ValueError):
+        return None
+
+
+def flatten_columns(df):
+    """Flatten MultiIndex columns that yfinance sometimes returns."""
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [
+            col[0] if isinstance(col, tuple) else col
+            for col in df.columns
+        ]
+    return df
+
+
 def generate_tv_link(symbol):
     sym = symbol.replace(".NS", "")
     return f"https://in.tradingview.com/symbols/NSE:{sym}/"
@@ -53,12 +74,17 @@ def generate_tv_link(symbol):
 
 def calculate_ut_bot(df, a=1, c=10):
     atr = df.ta.atr(length=c)
+    if atr is None or atr.isna().all():
+        return pd.Series(0.0, index=df.index), pd.Series(False, index=df.index), pd.Series(False, index=df.index)
     nLoss = a * atr
     trailing_stop = pd.Series(0.0, index=df.index)
     for i in range(1, len(df)):
         prev_stop = trailing_stop.iloc[i - 1]
         src = df['Close'].iloc[i]
         src_prev = df['Close'].iloc[i - 1]
+        if pd.isna(src) or pd.isna(src_prev) or pd.isna(nLoss.iloc[i]):
+            trailing_stop.iloc[i] = prev_stop
+            continue
         if src > prev_stop and src_prev > prev_stop:
             trailing_stop.iloc[i] = max(prev_stop, src - nLoss.iloc[i])
         elif src < prev_stop and src_prev < prev_stop:
@@ -71,24 +97,38 @@ def calculate_ut_bot(df, a=1, c=10):
 
 
 def signal_macd(df):
-    if 'MACDh_12_26_9' not in df.columns:
+    col = 'MACDh_12_26_9'
+    if col not in df.columns or df[col].dropna().shape[0] < 2:
         return '---'
-    if df['MACDh_12_26_9'].iloc[-1] > 0 and df['MACDh_12_26_9'].iloc[-2] < 0:
+    last = df[col].dropna()
+    if last.iloc[-1] > 0 and last.iloc[-2] < 0:
         return 'Buy'
-    elif df['MACDh_12_26_9'].iloc[-2] > 0 and df['MACDh_12_26_9'].iloc[-1] < 0:
+    if last.iloc[-2] > 0 and last.iloc[-1] < 0:
         return 'Sell'
     return '---'
 
 
 def signal_rsi(df):
-    if 'RSI_14' not in df.columns:
+    col = 'RSI_14'
+    if col not in df.columns or df[col].dropna().shape[0] < 2:
         return '---'
-    cur, prev = df['RSI_14'].iloc[-1], df['RSI_14'].iloc[-2]
+    vals = df[col].dropna()
+    cur, prev = vals.iloc[-1], vals.iloc[-2]
     if cur <= 35 and prev > 35:
         return 'Buy'
-    elif cur >= 55 and prev < 55:
+    if cur >= 55 and prev < 55:
         return 'Sell'
     return '---'
+
+
+def get_close_series(df):
+    """Prefer 'Close' over 'Adj Close'; drop leading NaN rows."""
+    for col in ('Close', 'Adj Close'):
+        if col in df.columns:
+            s = df[col].dropna()
+            if not s.empty:
+                return s
+    return None
 
 
 def run_technical_scan(stocks, period='1y', interval='1wk'):
@@ -100,45 +140,67 @@ def run_technical_scan(stocks, period='1y', interval='1wk'):
     results = []
     for stock in stocks:
         try:
-            df = yf.download(stock, period=period, progress=False, interval=interval, auto_adjust=False)
-            if df.empty:
-                continue
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns.get_level_values(0)]
-            if 'Close' not in df.columns:
-                continue
-            if len(df) < 3:
+            df = yf.download(
+                stock, period=period, progress=False,
+                interval=interval, auto_adjust=True
+            )
+            if df is None or df.empty:
                 continue
 
-            macd = df.ta.macd()
-            rsi = df.ta.rsi(length=14)
+            df = flatten_columns(df)
+
+            # Ensure we have a usable Close column
+            close = get_close_series(df)
+            if close is None or len(close) < 3:
+                continue
+
+            # Rebuild df with clean Close so indicators work
+            df['Close'] = df['Close'].ffill()
+
+            macd_df = df.ta.macd()
+            rsi_series = df.ta.rsi(length=14)
             trailing_stop, buy, sell = calculate_ut_bot(df)
-            df = pd.concat([df, macd, rsi, trailing_stop.rename('TrailingStop')], axis=1)
+
+            if macd_df is not None:
+                df = pd.concat([df, macd_df], axis=1)
+            if rsi_series is not None:
+                df = pd.concat([df, rsi_series.rename('RSI_14')], axis=1)
 
             macd_sig = signal_macd(df)
             rsi_sig = signal_rsi(df)
             ut_sig = 'Buy' if buy.iloc[-1] else ('Sell' if sell.iloc[-1] else '---')
 
-            price = float(df['Close'].iloc[-1])
-            prev_price = float(df['Close'].iloc[-2])
-            pct_chg = ((price - prev_price) / prev_price) * 100
+            # Use the last two non-NaN close prices for price & % change
+            valid_closes = df['Close'].dropna()
+            if len(valid_closes) < 2:
+                continue
 
-            rsi_val = float(df['RSI_14'].iloc[-1]) if 'RSI_14' in df.columns else None
-            macd_hist = float(df['MACDh_12_26_9'].iloc[-1]) if 'MACDh_12_26_9' in df.columns else None
+            price = safe_float(valid_closes.iloc[-1], 2)
+            prev_price = safe_float(valid_closes.iloc[-2])
+            if price is None or prev_price is None or prev_price == 0:
+                continue
+
+            pct_chg = safe_float(((price - prev_price) / prev_price) * 100, 2)
+
+            rsi_col = 'RSI_14'
+            rsi_val = safe_float(df[rsi_col].dropna().iloc[-1], 1) if rsi_col in df.columns and not df[rsi_col].dropna().empty else None
+
+            macd_col = 'MACDh_12_26_9'
+            macd_hist = safe_float(df[macd_col].dropna().iloc[-1], 3) if macd_col in df.columns and not df[macd_col].dropna().empty else None
 
             results.append({
                 'Stock': stock,
-                'Price': round(price, 2),
-                '% Change': round(pct_chg, 2),
-                'RSI': round(rsi_val, 1) if rsi_val is not None else None,
-                'MACD Hist': round(macd_hist, 3) if macd_hist is not None else None,
+                'Price': price,
+                '% Change': pct_chg,
+                'RSI': rsi_val,
+                'MACD Hist': macd_hist,
                 'MACD Signal': macd_sig,
                 'RSI Signal': rsi_sig,
                 'UT Bot': ut_sig,
                 'Chart': generate_tv_link(stock),
             })
         except Exception as e:
-            print(f"Error {stock}: {e}")
+            print(f"[tech] Error {stock}: {e}")
     return results
 
 
@@ -150,8 +212,8 @@ def _rsi(series, w=14):
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -1 * delta.clip(upper=0)
-    ag = gain.ewm(alpha=1/w, adjust=False).mean()
-    al = loss.ewm(alpha=1/w, adjust=False).mean()
+    ag = gain.ewm(alpha=1 / w, adjust=False).mean()
+    al = loss.ewm(alpha=1 / w, adjust=False).mean()
     rs = ag / (al.replace(0, np.nan))
     return (100 - (100 / (1 + rs))).fillna(50)
 
@@ -165,17 +227,27 @@ def _macd(series, fast=12, slow=26, signal=9):
 
 
 def _fund_score(ticker_obj):
-    info = ticker_obj.info if hasattr(ticker_obj, 'info') else {}
+    info = {}
+    try:
+        info = ticker_obj.info or {}
+    except Exception:
+        pass
+
     score = 0
     pe = info.get('trailingPE') or info.get('forwardPE')
+    pe = safe_float(pe)
     if pe and pe > 0:
         score += 2 if pe < 15 else (1 if pe < 25 else 0)
-    dte = info.get('debtToEquity')
+
+    dte = safe_float(info.get('debtToEquity'))
     if dte is not None:
         score += 1 if dte < 50 else (0.5 if dte < 100 else 0)
-    roe = info.get('returnOnEquity') or info.get('returnOnAssets')
+
+    roe_raw = info.get('returnOnEquity') or info.get('returnOnAssets')
+    roe = safe_float(roe_raw)
     if roe is not None:
         score += 1 if roe >= 0.15 else (0.5 if roe > 0.08 else 0)
+
     try:
         fin = ticker_obj.quarterly_financials
         if isinstance(fin, pd.DataFrame) and not fin.empty:
@@ -193,6 +265,7 @@ def _fund_score(ticker_obj):
                     score += 1
     except Exception:
         pass
+
     return round(score, 2), {"pe": pe, "de": dte, "roe": roe}
 
 
@@ -209,39 +282,61 @@ def run_fundamental_scan(stocks, period='1y', interval='1d'):
             hist = tk.history(period=period, interval=interval, actions=False)
             if hist is None or hist.empty or len(hist) < 10:
                 continue
-            close = hist['Close']
+
+            hist = flatten_columns(hist)
+            close_col = 'Close' if 'Close' in hist.columns else hist.columns[0]
+            close = hist[close_col].ffill().dropna()
+            if len(close) < 10:
+                continue
+
             s50 = _sma(close, 50)
             s200 = _sma(close, 200)
-            rsi_val = float(_rsi(close).iloc[-1])
+            rsi_val = safe_float(_rsi(close).iloc[-1], 1)
             _, _, mhist = _macd(close)
-            macd_h = float(mhist.iloc[-1])
-            price = float(close.iloc[-1])
+            macd_h = safe_float(mhist.iloc[-1], 3)
+            price = safe_float(close.iloc[-1], 2)
+
+            if price is None:
+                continue
 
             tscore = 0
-            if price > s200.iloc[-1]: tscore += 2
-            elif price > s50.iloc[-1]: tscore += 1
-            if s50.iloc[-1] > s200.iloc[-1]: tscore += 1
-            if 30 < rsi_val < 70: tscore += 1
-            elif rsi_val < 30: tscore += 0.5
-            if macd_h > 0: tscore += 0.5
+            s200_last = safe_float(s200.iloc[-1])
+            s50_last = safe_float(s50.iloc[-1])
+
+            if s200_last and price > s200_last:
+                tscore += 2
+            elif s50_last and price > s50_last:
+                tscore += 1
+            if s50_last and s200_last and s50_last > s200_last:
+                tscore += 1
+            if rsi_val is not None:
+                if 30 < rsi_val < 70:
+                    tscore += 1
+                elif rsi_val < 30:
+                    tscore += 0.5
+            if macd_h is not None and macd_h > 0:
+                tscore += 0.5
 
             fscore, fmeta = _fund_score(tk)
             fund_pct = fscore / 5
             tech_pct = tscore / 5
             final = round(0.6 * fund_pct + 0.4 * tech_pct, 3)
 
-            if fscore < 2.5:
-                rec = 'Sell'
-            else:
+            rec = 'Sell'
+            if fscore >= 2.5:
                 rec = 'Buy' if final >= 0.7 else ('Hold' if final >= 0.45 else 'Sell')
+
+            roe_display = None
+            if fmeta['roe'] is not None:
+                roe_display = safe_float(fmeta['roe'] * 100, 1)
 
             results.append({
                 'Symbol': sym,
-                'Price': round(price, 2),
-                'P/E': round(fmeta['pe'], 1) if fmeta['pe'] else None,
-                'D/E': round(fmeta['de'], 1) if fmeta['de'] else None,
-                'ROE': round(fmeta['roe'] * 100, 1) if fmeta['roe'] else None,
-                'RSI': round(rsi_val, 1),
+                'Price': price,
+                'P/E': safe_float(fmeta['pe'], 1),
+                'D/E': safe_float(fmeta['de'], 1),
+                'ROE': roe_display,
+                'RSI': rsi_val,
                 'Fund Score': fscore,
                 'Tech Score': round(tscore, 2),
                 'Final Score': final,
@@ -249,5 +344,5 @@ def run_fundamental_scan(stocks, period='1y', interval='1d'):
                 'Chart': generate_tv_link(sym)
             })
         except Exception as e:
-            print(f"Error {sym}: {e}")
+            print(f"[fund] Error {sym}: {e}")
     return results
