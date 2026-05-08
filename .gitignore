@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.pyc
+.env
+venv/
+.venv/
+*.csv
+attached_assets/
+.local/
+.config/
