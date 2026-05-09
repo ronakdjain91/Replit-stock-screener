@@ -3,4 +3,3 @@ gunicorn
 pandas
 numpy
 yfinance
-pandas-ta
