@@ -18,37 +18,36 @@ CUSTOM_STOCKS_FILE = "custom_stocks.json"
 TECH_CSV = "nifty50_signals.csv"
 FUND_CSV = "nifty_fund_scan.csv"
 
-scan_status = {"tech": "idle", "fund": "idle"}
-scan_results = {"tech": None, "fund": None}
-scan_params = {
+scan_status   = {"tech": "idle", "fund": "idle"}
+scan_results  = {"tech": None,   "fund": None}
+scan_progress = {"tech": {"current": 0, "total": 0},
+                 "fund": {"current": 0, "total": 0}}
+scan_params   = {
     "tech": {"period": "1y", "interval": "1wk"},
     "fund": {"period": "1y", "interval": "1d"}
 }
 
 
-# ── JSON sanitizer ──────────────────────────────────────────────────────────
+# ── JSON sanitizer ────────────────────────────────────────────────────────────
 def _clean_value(v):
-    """Convert NaN/Inf floats to None so they become JSON null."""
     if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
         return None
     return v
 
 
 def clean_rows(rows):
-    """Recursively sanitize a list of dicts for safe JSON encoding."""
-    cleaned = []
-    for row in rows:
-        cleaned.append({k: _clean_value(v) for k, v in row.items()})
-    return cleaned
+    return [{k: _clean_value(v) for k, v in row.items()} for row in rows]
 
 
 def safe_jsonify(payload):
-    """jsonify wrapper that replaces NaN/Inf with null."""
-    text = json.dumps(payload, default=lambda v: None if isinstance(v, float) and (math.isnan(v) or math.isinf(v)) else v)
+    text = json.dumps(
+        payload,
+        default=lambda v: None if isinstance(v, float) and (math.isnan(v) or math.isinf(v)) else v
+    )
     return Response(text, mimetype='application/json')
 
 
-# ── Stock management ─────────────────────────────────────────────────────────
+# ── Stock management ──────────────────────────────────────────────────────────
 def load_custom_stocks():
     if os.path.exists(CUSTOM_STOCKS_FILE):
         try:
@@ -74,18 +73,25 @@ def get_fund_stocks():
     return list(dict.fromkeys(DEFAULT_NIFTY50 + custom))
 
 
-# ── Background scan threads ──────────────────────────────────────────────────
+# ── Background scan threads ───────────────────────────────────────────────────
 def do_tech_scan(period, interval):
     scan_status["tech"] = "running"
     scan_params["tech"] = {"period": period, "interval": interval}
+    scan_progress["tech"] = {"current": 0, "total": 0}
     try:
         stocks = get_tech_stocks()
-        results = run_technical_scan(stocks, period=period, interval=interval)
+        scan_progress["tech"]["total"] = len(stocks)
+
+        def progress_cb(current, total):
+            scan_progress["tech"] = {"current": current, "total": total}
+
+        results = run_technical_scan(stocks, period=period, interval=interval,
+                                     progress_cb=progress_cb)
         if results:
             df = pd.DataFrame(results)
             df.to_csv(TECH_CSV, index=False)
         scan_results["tech"] = clean_rows(results)
-        scan_status["tech"] = "done"
+        scan_status["tech"]  = "done"
     except Exception as e:
         print(f"[do_tech_scan] {e}")
         scan_status["tech"] = f"error:{e}"
@@ -94,33 +100,44 @@ def do_tech_scan(period, interval):
 def do_fund_scan(period, interval):
     scan_status["fund"] = "running"
     scan_params["fund"] = {"period": period, "interval": interval}
+    scan_progress["fund"] = {"current": 0, "total": 0}
     try:
         stocks = get_fund_stocks()
-        results = run_fundamental_scan(stocks, period=period, interval=interval)
+        scan_progress["fund"]["total"] = len(stocks)
+
+        def progress_cb(current, total):
+            scan_progress["fund"] = {"current": current, "total": total}
+
+        results = run_fundamental_scan(stocks, period=period, interval=interval,
+                                       progress_cb=progress_cb)
         if results:
             df = pd.DataFrame(results)
             df = df.sort_values("Final Score", ascending=False)
             df.to_csv(FUND_CSV, index=False)
         scan_results["fund"] = clean_rows(results)
-        scan_status["fund"] = "done"
+        scan_status["fund"]  = "done"
     except Exception as e:
         print(f"[do_fund_scan] {e}")
         scan_status["fund"] = f"error:{e}"
 
 
-# ── CSV loaders ──────────────────────────────────────────────────────────────
+# ── CSV loaders ───────────────────────────────────────────────────────────────
 def _float_or_none(v):
-    """Parse a value from a CSV cell; return None if missing/NaN."""
     if v is None or v == '' or (isinstance(v, float) and math.isnan(v)):
         return None
     return safe_float(v)
+
+
+def _str_or(row, key, default='---'):
+    val = row.get(key, '')
+    return str(val) if val and str(val) not in ('', 'nan', 'None') else default
 
 
 def load_tech_csv():
     if not os.path.exists(TECH_CSV):
         return []
     try:
-        df = pd.read_csv(TECH_CSV, dtype=str)   # read everything as string first
+        df = pd.read_csv(TECH_CSV, dtype=str)
     except Exception:
         return []
     rows = []
@@ -128,22 +145,28 @@ def load_tech_csv():
         stock = r.get('Stock', '')
         if not stock:
             continue
-
         price = _float_or_none(r.get('Price', ''))
         pct   = _float_or_none(r.get('% Change', ''))
         rsi   = _float_or_none(r.get('RSI', ''))
         macdh = _float_or_none(r.get('MACD Hist', ''))
-
         rows.append({
-            'Stock':       str(stock),
-            'Price':       round(price, 2)  if price is not None else None,
-            '% Change':    round(pct, 2)    if pct   is not None else None,
-            'RSI':         round(rsi, 1)    if rsi   is not None else None,
-            'MACD Hist':   round(macdh, 3)  if macdh is not None else None,
-            'MACD Signal': str(r.get('MACD Signal', '---') or '---'),
-            'RSI Signal':  str(r.get('RSI Signal',  '---') or '---'),
-            'UT Bot':      str(r.get('UT Bot',       '---') or '---'),
-            'Chart':       str(r.get('Chart', '') or ''),
+            'Stock':        str(stock),
+            'Consensus':    _str_or(r, 'Consensus', 'Neutral'),
+            'Strength':     _float_or_none(r.get('Strength', '')) or 0,
+            'Trend':        _str_or(r, 'Trend', '---'),
+            'Vol Spike':    _str_or(r, 'Vol Spike', 'No'),
+            'Vol Ratio':    _float_or_none(r.get('Vol Ratio', '')),
+            'Price':        round(price, 2) if price is not None else None,
+            '% Change':     round(pct,   2) if pct   is not None else None,
+            'RSI':          round(rsi,   1) if rsi   is not None else None,
+            'MACD Hist':    round(macdh, 3) if macdh is not None else None,
+            'MACD Signal':  _str_or(r, 'MACD Signal', '---'),
+            'RSI Signal':   _str_or(r, 'RSI Signal',  '---'),
+            'UT Bot':       _str_or(r, 'UT Bot',       '---'),
+            'Beta':         _float_or_none(r.get('Beta', '')),
+            '200 SMA':      _float_or_none(r.get('200 SMA', '')),
+            'Last Scanned': _str_or(r, 'Last Scanned', ''),
+            'Chart':        _str_or(r, 'Chart', ''),
         })
     return rows
 
@@ -162,16 +185,18 @@ def load_fund_csv():
             continue
         rows.append({
             'Symbol':         str(sym),
+            'Sector':         _str_or(r, 'Sector', '---'),
             'Price':          _float_or_none(r.get('Price', '')),
             'P/E':            _float_or_none(r.get('P/E', '')),
+            'Sector Med P/E': _float_or_none(r.get('Sector Med P/E', '')),
             'D/E':            _float_or_none(r.get('D/E', '')),
             'ROE':            _float_or_none(r.get('ROE', '')),
             'RSI':            _float_or_none(r.get('RSI', '')),
             'Fund Score':     _float_or_none(r.get('Fund Score', '')),
             'Tech Score':     _float_or_none(r.get('Tech Score', '')),
             'Final Score':    _float_or_none(r.get('Final Score', '')),
-            'Recommendation': str(r.get('Recommendation', '---') or '---'),
-            'Chart':          str(r.get('Chart', '') or ''),
+            'Recommendation': _str_or(r, 'Recommendation', '---'),
+            'Chart':          _str_or(r, 'Chart', ''),
         })
     return rows
 
@@ -185,7 +210,7 @@ def normalize_symbol(raw):
     return sym
 
 
-# ── Routes ───────────────────────────────────────────────────────────────────
+# ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -196,11 +221,7 @@ def data_tech():
     rows = scan_results["tech"] if scan_results["tech"] is not None else load_tech_csv()
     mtime = os.path.getmtime(TECH_CSV) if os.path.exists(TECH_CSV) else None
     generated_at = datetime.fromtimestamp(mtime).strftime("%d %b %Y, %H:%M") if mtime else None
-    return safe_jsonify({
-        "rows": rows or [],
-        "generated_at": generated_at,
-        "params": scan_params["tech"]
-    })
+    return safe_jsonify({"rows": rows or [], "generated_at": generated_at, "params": scan_params["tech"]})
 
 
 @app.route("/api/data/fund")
@@ -208,16 +229,12 @@ def data_fund():
     rows = scan_results["fund"] if scan_results["fund"] is not None else load_fund_csv()
     mtime = os.path.getmtime(FUND_CSV) if os.path.exists(FUND_CSV) else None
     generated_at = datetime.fromtimestamp(mtime).strftime("%d %b %Y, %H:%M") if mtime else None
-    return safe_jsonify({
-        "rows": rows or [],
-        "generated_at": generated_at,
-        "params": scan_params["fund"]
-    })
+    return safe_jsonify({"rows": rows or [], "generated_at": generated_at, "params": scan_params["fund"]})
 
 
 @app.route("/api/run/<scanner>", methods=["POST"])
 def run_scanner(scanner):
-    body = request.get_json(silent=True) or {}
+    body     = request.get_json(silent=True) or {}
     period   = body.get("period", "1y")
     interval = body.get("interval", "1wk" if scanner == "tech" else "1d")
 
@@ -237,19 +254,20 @@ def status(scanner):
     return jsonify({"status": scan_status.get(scanner, "unknown")})
 
 
+@app.route("/api/progress/<scanner>")
+def progress(scanner):
+    return jsonify(scan_progress.get(scanner, {"current": 0, "total": 0}))
+
+
 @app.route("/api/stocks", methods=["GET"])
 def list_stocks():
     custom = load_custom_stocks()
-    return jsonify({
-        "default_tech": DEFAULT_NIFTY100,
-        "default_fund": DEFAULT_NIFTY50,
-        "custom": custom
-    })
+    return jsonify({"default_tech": DEFAULT_NIFTY100, "default_fund": DEFAULT_NIFTY50, "custom": custom})
 
 
 @app.route("/api/stocks", methods=["POST"])
 def add_stock():
-    body = request.get_json(silent=True) or {}
+    body   = request.get_json(silent=True) or {}
     symbol = normalize_symbol(body.get("symbol", ""))
     if not symbol:
         return jsonify({"error": "Symbol required"}), 400
@@ -275,7 +293,7 @@ def upload_stocks():
         return jsonify({"error": f"Could not parse CSV: {e}"}), 400
 
     symbol_col = None
-    priority = ['symbol', 'stock', 'ticker', 'scrip', 'name', 'code']
+    priority   = ['symbol', 'stock', 'ticker', 'scrip', 'name', 'code']
     lower_cols = {c.lower(): c for c in df.columns}
     for p in priority:
         if p in lower_cols:
@@ -285,12 +303,12 @@ def upload_stocks():
         symbol_col = df.columns[0]
 
     raw_symbols = df[symbol_col].dropna().astype(str).tolist()
-    custom = load_custom_stocks()
-    all_known = set(DEFAULT_NIFTY100 + DEFAULT_NIFTY50 + custom)
-
+    custom      = load_custom_stocks()
+    all_known   = set(DEFAULT_NIFTY100 + DEFAULT_NIFTY50 + custom)
     added, skipped, invalid = [], [], []
+
     for raw in raw_symbols:
-        sym = normalize_symbol(raw)
+        sym  = normalize_symbol(raw)
         if not sym:
             continue
         base = sym.replace('.NS', '').replace('-', '').replace('&', '')
@@ -306,10 +324,8 @@ def upload_stocks():
                 skipped.append(sym)
 
     save_custom_stocks(custom)
-    return jsonify({
-        "success": True, "added": added, "skipped": skipped,
-        "invalid": invalid, "total_custom": len(custom)
-    })
+    return jsonify({"success": True, "added": added, "skipped": skipped,
+                    "invalid": invalid, "total_custom": len(custom)})
 
 
 @app.route("/api/stocks/<symbol>", methods=["DELETE"])
