@@ -11,6 +11,7 @@ from scanner import (
     run_technical_scan, run_fundamental_scan,
     safe_float
 )
+import paper_trade as pt
 
 app = Flask(__name__)
 
@@ -357,6 +358,83 @@ def download_fund():
     if not os.path.exists(FUND_CSV):
         return jsonify({"error": "No file"}), 404
     return send_file(FUND_CSV, as_attachment=True, download_name="nifty_fundamental_scan.csv")
+
+
+# ── Paper Trading Routes ──────────────────────────────────────────────────────
+@app.route("/api/paper/portfolio")
+def paper_portfolio():
+    with_prices = request.args.get('prices', 'true').lower() == 'true'
+    portfolio = pt.get_portfolio(with_prices=with_prices)
+    return safe_jsonify(portfolio)
+
+
+@app.route("/api/paper/trade", methods=["POST"])
+def paper_add_trade():
+    body   = request.get_json(silent=True) or {}
+    symbol = normalize_symbol(body.get('symbol', ''))
+    if not symbol:
+        return jsonify({'error': 'Symbol required'}), 400
+    action = body.get('action', 'Buy')
+    if action not in ('Buy', 'Sell'):
+        return jsonify({'error': 'Action must be Buy or Sell'}), 400
+    try:
+        quantity    = int(body.get('quantity', 1))
+        entry_price = float(body.get('entry_price', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid quantity or price'}), 400
+    if quantity <= 0:
+        return jsonify({'error': 'Quantity must be > 0'}), 400
+    if entry_price <= 0:
+        return jsonify({'error': 'Entry price must be > 0'}), 400
+    notes = str(body.get('notes', ''))
+    trade = pt.add_trade(symbol, action, quantity, entry_price, notes)
+    return jsonify({'success': True, 'trade': trade})
+
+
+@app.route("/api/paper/trade/<trade_id>/close", methods=["PUT"])
+def paper_close_trade(trade_id):
+    body = request.get_json(silent=True) or {}
+    try:
+        exit_price = float(body.get('exit_price', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid exit price'}), 400
+    if exit_price <= 0:
+        return jsonify({'error': 'Exit price must be > 0'}), 400
+    trade = pt.close_trade(trade_id, exit_price)
+    if trade is None:
+        return jsonify({'error': 'Trade not found or already closed'}), 404
+    return jsonify({'success': True, 'trade': trade})
+
+
+@app.route("/api/paper/trade/<trade_id>", methods=["DELETE"])
+def paper_delete_trade(trade_id):
+    ok = pt.delete_trade(trade_id)
+    if not ok:
+        return jsonify({'error': 'Trade not found'}), 404
+    return jsonify({'success': True})
+
+
+@app.route("/api/paper/capital", methods=["PUT"])
+def paper_set_capital():
+    body = request.get_json(silent=True) or {}
+    try:
+        capital = float(body.get('capital', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid capital amount'}), 400
+    if capital <= 0:
+        return jsonify({'error': 'Capital must be > 0'}), 400
+    pt.set_capital(capital)
+    return jsonify({'success': True, 'capital': capital})
+
+
+@app.route("/api/paper/price/<symbol>")
+def paper_get_price(symbol):
+    sym    = normalize_symbol(symbol)
+    prices = pt.fetch_prices({sym})
+    price  = prices.get(sym)
+    if price is None:
+        return jsonify({'error': 'Could not fetch price'}), 404
+    return jsonify({'symbol': sym, 'price': price})
 
 
 if __name__ == "__main__":

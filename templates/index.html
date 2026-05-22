@@ -315,6 +315,27 @@
       .stats-row{grid-template-columns:repeat(2,1fr)}
       .toolbar-actions{gap:5px}.btn-success span{display:none}
     }
+
+    /* ── PAPER TRADE TABLE ── */
+    .pth{
+      background:#0a1628!important;color:var(--muted2)!important;font-weight:600;
+      font-size:11px;text-transform:uppercase;letter-spacing:.4px;
+      padding:10px 14px;border-bottom:1px solid var(--border);
+      white-space:nowrap;text-align:left;
+    }
+    .ptd{padding:10px 14px;border-bottom:1px solid #141f33;white-space:nowrap;color:#cbd5e1;vertical-align:middle}
+    #pp-open-table tbody tr:hover td,
+    #pp-closed-body tr:hover td{background:#162035}
+    .pp-pnl-pos{color:var(--green);font-weight:700}
+    .pp-pnl-neg{color:var(--red);font-weight:700}
+    .pp-pnl-zero{color:var(--muted2)}
+    .pp-action-buy{background:#052e16;color:#4ade80;border:1px solid #16a34a;border-radius:99px;font-size:11px;font-weight:700;padding:2px 9px;white-space:nowrap}
+    .pp-action-sell{background:#450a0a;color:#fca5a5;border:1px solid #dc2626;border-radius:99px;font-size:11px;font-weight:700;padding:2px 9px;white-space:nowrap}
+    .pp-close-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--accent);background:transparent;color:var(--accent2);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+    .pp-close-btn:hover{background:var(--accent);color:#fff}
+    .pp-del-btn{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s}
+    .pp-del-btn:hover{border-color:var(--red);color:var(--red)}
+    .pp-note{font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis}
   </style>
 </head>
 <body>
@@ -329,6 +350,7 @@
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('tech',this)">📈 Technical — Nifty 100</button>
   <button class="tab-btn" onclick="switchTab('fund',this)">🏦 Fund+Tech — Nifty 50</button>
+  <button class="tab-btn" onclick="switchTab('paper',this);loadPaperPortfolio(false)">📝 Paper Trade</button>
 </div>
 
 <div class="container">
@@ -617,7 +639,196 @@
     </div>
   </div><!-- /panel-fund -->
 
+
+  <!-- ═══ PAPER TRADE TAB ═══ -->
+  <div class="panel" id="panel-paper">
+
+    <div class="stats-row" id="paper-stats-row">
+      <div class="stat-card"><div class="stat-label">Starting Capital</div><div class="stat-value sv-total" id="pp-capital">—</div><div class="stat-sub">paper ₹</div></div>
+      <div class="stat-card"><div class="stat-label">Invested</div><div class="stat-value sv-hold" id="pp-invested">—</div><div class="stat-sub">open positions</div></div>
+      <div class="stat-card"><div class="stat-label">Current Value</div><div class="stat-value sv-up" id="pp-curval">—</div><div class="stat-sub">live prices</div></div>
+      <div class="stat-card"><div class="stat-label">Unrealised P&amp;L</div><div class="stat-value" id="pp-unrealised">—</div><div class="stat-sub">open trades</div></div>
+      <div class="stat-card"><div class="stat-label">Realised P&amp;L</div><div class="stat-value" id="pp-realised">—</div><div class="stat-sub">closed trades</div></div>
+      <div class="stat-card"><div class="stat-label">Available</div><div class="stat-value sv-buy" id="pp-available">—</div><div class="stat-sub">capital - invested</div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar" style="margin-bottom:10px">
+      <div class="toolbar-top">
+        <div>
+          <div class="toolbar-title">Paper Portfolio</div>
+          <div class="toolbar-meta" id="pp-meta">Track signals with virtual money before trading real.</div>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn btn-ghost btn-sm" onclick="refreshPaperPrices()" id="pp-refresh-btn">↻ Refresh Prices</button>
+          <button class="btn btn-ghost btn-sm" onclick="openCapitalModal()">⚙ Set Capital</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddTradeForm()">+ Add Trade</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Trade Form (hidden by default) -->
+    <div id="add-trade-form" style="display:none;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:16px 20px;margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        New Paper Trade
+        <button onclick="closeAddTradeForm()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px">
+        <div>
+          <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:4px">Stock Symbol</label>
+          <input id="pt-symbol" type="text" placeholder="e.g. RELIANCE" style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none" oninput="this.value=this.value.toUpperCase()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:4px">Action</label>
+          <div style="display:flex;gap:4px">
+            <button id="pt-buy-btn"  onclick="setPtAction('Buy')"  class="btn btn-sm" style="flex:1;background:#052e16;color:#4ade80;border:1px solid #16a34a">Buy</button>
+            <button id="pt-sell-btn" onclick="setPtAction('Sell')" class="btn btn-sm" style="flex:1;background:var(--surface2);color:var(--muted2);border:1px solid var(--border)">Sell</button>
+          </div>
+          <input type="hidden" id="pt-action" value="Buy"/>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:4px">Quantity (Shares)</label>
+          <input id="pt-qty" type="number" min="1" value="1" placeholder="e.g. 10" style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:4px">Entry Price (₹)</label>
+          <div style="position:relative">
+            <input id="pt-price" type="number" min="0.01" step="0.01" placeholder="e.g. 2400.50" style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+            <button onclick="fetchAndFillPrice()" title="Fetch live price" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--accent2);font-size:13px;cursor:pointer;padding:2px">⬇</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:4px">Notes (optional)</label>
+          <input id="pt-notes" type="text" placeholder="e.g. MACD crossover" style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn btn-primary" style="width:100%" onclick="submitPaperTrade()">Add Trade</button>
+        </div>
+      </div>
+      <div id="pt-msg" style="font-size:12px;margin-top:4px"></div>
+    </div>
+
+    <!-- Open Positions -->
+    <div style="margin-bottom:8px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">
+      Open Positions <span id="pp-open-count" style="background:var(--accent);color:#fff;border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px">0</span>
+    </div>
+    <div class="table-card" style="margin-bottom:16px">
+      <div id="pp-open-empty" class="empty-state" style="padding:30px 20px">
+        <div class="icon">📋</div>
+        <p>No open positions.</p>
+        <small>Click "Add Trade" to enter your first paper trade.</small>
+      </div>
+      <div id="pp-open-wrap" style="display:none;overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table style="width:100%;border-collapse:collapse;font-size:13px" id="pp-open-table">
+          <thead>
+            <tr style="background:#0a1628">
+              <th class="pth">Stock</th>
+              <th class="pth">Action</th>
+              <th class="pth">Qty</th>
+              <th class="pth">Entry ₹</th>
+              <th class="pth">Current ₹</th>
+              <th class="pth">Invested ₹</th>
+              <th class="pth">Value ₹</th>
+              <th class="pth">P&amp;L ₹</th>
+              <th class="pth">P&amp;L %</th>
+              <th class="pth">Entry Date</th>
+              <th class="pth">Notes</th>
+              <th class="pth">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pp-open-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Closed Trades -->
+    <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Closed Trades</span>
+      <span id="pp-closed-count" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted2);border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700">0</span>
+      <button onclick="toggleClosedTrades()" id="pp-closed-toggle" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;margin-left:auto">Show ▼</button>
+    </div>
+    <div class="table-card" id="pp-closed-section" style="display:none">
+      <div id="pp-closed-empty" class="empty-state" style="padding:24px 20px">
+        <p style="font-size:13px">No closed trades yet.</p>
+      </div>
+      <div id="pp-closed-wrap" style="display:none;overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:#0a1628">
+              <th class="pth">Stock</th>
+              <th class="pth">Action</th>
+              <th class="pth">Qty</th>
+              <th class="pth">Entry ₹</th>
+              <th class="pth">Exit ₹</th>
+              <th class="pth">Realised P&amp;L ₹</th>
+              <th class="pth">P&amp;L %</th>
+              <th class="pth">Entry Date</th>
+              <th class="pth">Exit Date</th>
+              <th class="pth">Notes</th>
+              <th class="pth">Del</th>
+            </tr>
+          </thead>
+          <tbody id="pp-closed-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /panel-paper -->
+
 </div><!-- /container -->
+
+<!-- ═══ CLOSE POSITION MODAL ═══ -->
+<div class="modal-overlay" id="close-trade-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div><div class="modal-handle"></div><span class="modal-title">Close Position</span></div>
+      <button class="modal-close" onclick="closeCloseModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:14px" id="close-trade-info">—</div>
+      <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:6px">Exit Price (₹)</label>
+      <input id="close-price-input" type="number" min="0.01" step="0.01" placeholder="Enter exit price"
+             style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none;margin-bottom:10px"
+             onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+             onkeydown="if(event.key==='Enter')confirmClose()"/>
+      <div id="close-pnl-preview" style="font-size:13px;padding:8px 12px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);min-height:36px"></div>
+      <div id="close-msg" style="margin-top:8px;font-size:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCloseModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmClose()">Confirm Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SET CAPITAL MODAL ═══ -->
+<div class="modal-overlay" id="capital-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div><div class="modal-handle"></div><span class="modal-title">Set Starting Capital</span></div>
+      <button class="modal-close" onclick="document.getElementById('capital-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted2);margin-bottom:14px">Set your virtual paper trading capital in Indian Rupees.</p>
+      <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:6px">Capital (₹)</label>
+      <input id="capital-input" type="number" min="1000" step="1000" value="100000" placeholder="e.g. 500000"
+             style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none;margin-bottom:6px"
+             onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+             onkeydown="if(event.key==='Enter')saveCapital()"/>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
+        <button onclick="document.getElementById('capital-input').value=100000" class="btn btn-ghost btn-xs">₹1L</button>
+        <button onclick="document.getElementById('capital-input').value=500000" class="btn btn-ghost btn-xs">₹5L</button>
+        <button onclick="document.getElementById('capital-input').value=1000000" class="btn btn-ghost btn-xs">₹10L</button>
+        <button onclick="document.getElementById('capital-input').value=2500000" class="btn btn-ghost btn-xs">₹25L</button>
+      </div>
+      <div id="capital-msg" style="font-size:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('capital-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCapital()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ MANAGE STOCKS MODAL ═══ -->
 <div class="modal-overlay" id="stocks-modal">
@@ -1398,11 +1609,337 @@ function downloadTemplate() {
 document.getElementById('stocks-modal').addEventListener('click', function(e) {
   if (e.target === this) closeStocksModal();
 });
+document.getElementById('close-trade-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeCloseModal();
+});
+document.getElementById('capital-modal').addEventListener('click', function(e) {
+  if (e.target === this) e.currentTarget.classList.remove('open');
+});
 
 initFilters();
 window.addEventListener('resize', initFilters);
 loadData('tech');
 loadData('fund');
+
+// ═══════════════════════════════════════════════════════════════════
+// PAPER TRADING
+// ═══════════════════════════════════════════════════════════════════
+
+let _closingTradeId   = null;
+let _closingEntryPrice = 0;
+let _closingQty        = 0;
+let _closingAction     = 'Buy';
+let _closedVisible     = false;
+let _paperData         = null;
+
+function inr(v) {
+  if (v === null || v === undefined) return '—';
+  return '₹' + parseFloat(v).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function pnlHtml(v, pct) {
+  if (v === null || v === undefined) return '<span class="pp-pnl-zero">—</span>';
+  const sign = v > 0 ? '+' : '';
+  const cls  = v > 0 ? 'pp-pnl-pos' : v < 0 ? 'pp-pnl-neg' : 'pp-pnl-zero';
+  const pctStr = (pct !== null && pct !== undefined)
+    ? ` <span style="font-size:11px;opacity:.8">(${v > 0 ? '+' : ''}${pct}%)</span>` : '';
+  return `<span class="${cls}">${sign}${inr(v)}${pctStr}</span>`;
+}
+
+function loadPaperPortfolio(withPrices = true) {
+  document.getElementById('pp-meta').textContent = withPrices ? 'Fetching live prices…' : 'Loading…';
+  fetch('/api/paper/portfolio?prices=' + withPrices)
+    .then(r => r.json())
+    .then(d => {
+      _paperData = d;
+      renderPaperSummary(d);
+      renderOpenTrades(d.open_trades);
+      renderClosedTrades(d.closed_trades);
+      const t = new Date();
+      document.getElementById('pp-meta').textContent =
+        `Updated at ${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')} · ${d.summary.open_count} open · ${d.summary.closed_count} closed`;
+    })
+    .catch(() => document.getElementById('pp-meta').textContent = 'Error loading portfolio.');
+}
+
+function refreshPaperPrices() {
+  const btn = document.getElementById('pp-refresh-btn');
+  btn.disabled = true;
+  btn.textContent = '↻ Refreshing…';
+  loadPaperPortfolio(true);
+  setTimeout(() => { btn.disabled = false; btn.textContent = '↻ Refresh Prices'; }, 5000);
+}
+
+function renderPaperSummary(d) {
+  const s = d.summary;
+  document.getElementById('pp-capital').textContent   = inr(d.capital);
+  document.getElementById('pp-invested').textContent  = inr(s.total_invested);
+  document.getElementById('pp-curval').textContent    = inr(s.current_value);
+  document.getElementById('pp-available').textContent = inr(s.available);
+
+  // Unrealised P&L
+  const uEl = document.getElementById('pp-unrealised');
+  const u   = s.unrealized_pnl;
+  uEl.textContent = (u >= 0 ? '+' : '') + inr(u);
+  uEl.className   = 'stat-value ' + (u > 0 ? 'sv-buy' : u < 0 ? 'sv-sell' : 'pp-pnl-zero');
+
+  // Realised P&L
+  const rEl = document.getElementById('pp-realised');
+  const r   = s.realized_pnl;
+  rEl.textContent = (r >= 0 ? '+' : '') + inr(r);
+  rEl.className   = 'stat-value ' + (r > 0 ? 'sv-buy' : r < 0 ? 'sv-sell' : 'pp-pnl-zero');
+
+  document.getElementById('pp-open-count').textContent   = s.open_count;
+  document.getElementById('pp-closed-count').textContent = s.closed_count;
+}
+
+function renderOpenTrades(trades) {
+  const empty = document.getElementById('pp-open-empty');
+  const wrap  = document.getElementById('pp-open-wrap');
+  const body  = document.getElementById('pp-open-body');
+
+  if (!trades || trades.length === 0) {
+    empty.style.display = 'block';
+    wrap.style.display  = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  wrap.style.display  = 'block';
+
+  body.innerHTML = trades.map(t => {
+    const sym      = t.symbol.replace('.NS','');
+    const actBadge = t.action === 'Buy'
+      ? '<span class="pp-action-buy">Buy</span>'
+      : '<span class="pp-action-sell">Sell</span>';
+    const curP  = t.current_price !== null ? inr(t.current_price) : '<span style="color:var(--muted)">—</span>';
+    const pnlH  = pnlHtml(t.unrealized_pnl, t.unrealized_pnl_pct);
+    const note  = t.notes ? `<span class="pp-note" title="${t.notes}">${t.notes}</span>` : '<span style="color:var(--muted)">—</span>';
+
+    return `<tr>
+      <td class="ptd"><span style="font-weight:700;color:var(--text)">${sym}</span></td>
+      <td class="ptd">${actBadge}</td>
+      <td class="ptd">${t.quantity}</td>
+      <td class="ptd">${inr(t.entry_price)}</td>
+      <td class="ptd">${curP}</td>
+      <td class="ptd">${inr(t.invested)}</td>
+      <td class="ptd">${inr(t.current_value)}</td>
+      <td class="ptd">${pnlH}</td>
+      <td class="ptd">${t.unrealized_pnl_pct !== null ? (t.unrealized_pnl_pct > 0 ? '+' : '') + t.unrealized_pnl_pct + '%' : '—'}</td>
+      <td class="ptd" style="font-size:11px;color:var(--muted)">${t.entry_date}</td>
+      <td class="ptd">${note}</td>
+      <td class="ptd" style="display:flex;gap:5px;align-items:center">
+        <button class="pp-close-btn" onclick="openCloseModal('${t.id}','${t.symbol}',${t.entry_price},${t.quantity},'${t.action}',${t.current_price || 0})">Close</button>
+        <button class="pp-del-btn" onclick="deleteTrade('${t.id}',true)" title="Delete trade">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderClosedTrades(trades) {
+  const empty = document.getElementById('pp-closed-empty');
+  const wrap  = document.getElementById('pp-closed-wrap');
+  const body  = document.getElementById('pp-closed-body');
+
+  if (!trades || trades.length === 0) {
+    empty.style.display = 'block';
+    wrap.style.display  = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  wrap.style.display  = 'block';
+
+  body.innerHTML = trades.map(t => {
+    const sym      = t.symbol.replace('.NS','');
+    const actBadge = t.action === 'Buy'
+      ? '<span class="pp-action-buy">Buy</span>'
+      : '<span class="pp-action-sell">Sell</span>';
+    const invested = t.entry_price * t.quantity;
+    const pnlPct   = invested ? round2((t.realized_pnl / invested) * 100) : null;
+    const note = t.notes ? `<span class="pp-note" title="${t.notes}">${t.notes}</span>` : '<span style="color:var(--muted)">—</span>';
+
+    return `<tr>
+      <td class="ptd"><span style="font-weight:700;color:var(--text)">${sym}</span></td>
+      <td class="ptd">${actBadge}</td>
+      <td class="ptd">${t.quantity}</td>
+      <td class="ptd">${inr(t.entry_price)}</td>
+      <td class="ptd">${inr(t.exit_price)}</td>
+      <td class="ptd">${pnlHtml(t.realized_pnl, pnlPct)}</td>
+      <td class="ptd">${pnlPct !== null ? (pnlPct > 0 ? '+' : '') + pnlPct + '%' : '—'}</td>
+      <td class="ptd" style="font-size:11px;color:var(--muted)">${t.entry_date}</td>
+      <td class="ptd" style="font-size:11px;color:var(--muted)">${t.exit_date || '—'}</td>
+      <td class="ptd">${note}</td>
+      <td class="ptd"><button class="pp-del-btn" onclick="deleteTrade('${t.id}',false)" title="Delete">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function round2(v) { return Math.round(v * 100) / 100; }
+
+// ── Add Trade Form ─────────────────────────────────────────────────
+function openAddTradeForm() {
+  const f = document.getElementById('add-trade-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  if (f.style.display === 'block') document.getElementById('pt-symbol').focus();
+}
+function closeAddTradeForm() {
+  document.getElementById('add-trade-form').style.display = 'none';
+  document.getElementById('pt-msg').innerHTML = '';
+}
+
+function setPtAction(action) {
+  document.getElementById('pt-action').value = action;
+  const buyBtn  = document.getElementById('pt-buy-btn');
+  const sellBtn = document.getElementById('pt-sell-btn');
+  if (action === 'Buy') {
+    buyBtn.style.background  = '#052e16'; buyBtn.style.color  = '#4ade80'; buyBtn.style.borderColor  = '#16a34a';
+    sellBtn.style.background = 'var(--surface2)'; sellBtn.style.color = 'var(--muted2)'; sellBtn.style.borderColor = 'var(--border)';
+  } else {
+    sellBtn.style.background = '#450a0a'; sellBtn.style.color  = '#fca5a5'; sellBtn.style.borderColor  = '#dc2626';
+    buyBtn.style.background  = 'var(--surface2)'; buyBtn.style.color = 'var(--muted2)'; buyBtn.style.borderColor = 'var(--border)';
+  }
+}
+
+function fetchAndFillPrice() {
+  const sym = document.getElementById('pt-symbol').value.trim();
+  if (!sym) { document.getElementById('pt-msg').innerHTML = '<span style="color:var(--orange)">Enter a symbol first.</span>'; return; }
+  document.getElementById('pt-msg').innerHTML = '<span style="color:var(--muted)">Fetching live price…</span>';
+  fetch(`/api/paper/price/${encodeURIComponent(sym)}`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.price) {
+        document.getElementById('pt-price').value = d.price;
+        document.getElementById('pt-msg').innerHTML = `<span style="color:var(--green)">Live price: ₹${d.price}</span>`;
+      } else {
+        document.getElementById('pt-msg').innerHTML = `<span style="color:var(--red)">Could not fetch price. Enter manually.</span>`;
+      }
+    }).catch(() => document.getElementById('pt-msg').innerHTML = '<span style="color:var(--red)">Network error.</span>');
+}
+
+function submitPaperTrade() {
+  const sym   = document.getElementById('pt-symbol').value.trim();
+  const action= document.getElementById('pt-action').value;
+  const qty   = parseInt(document.getElementById('pt-qty').value);
+  const price = parseFloat(document.getElementById('pt-price').value);
+  const notes = document.getElementById('pt-notes').value.trim();
+  const msg   = document.getElementById('pt-msg');
+
+  if (!sym)          { msg.innerHTML = '<span style="color:var(--red)">Symbol is required.</span>'; return; }
+  if (!qty || qty<1) { msg.innerHTML = '<span style="color:var(--red)">Quantity must be ≥ 1.</span>'; return; }
+  if (!price||price<=0){ msg.innerHTML='<span style="color:var(--red)">Enter a valid entry price.</span>'; return; }
+
+  msg.innerHTML = '<span style="color:var(--muted)">Adding trade…</span>';
+  fetch('/api/paper/trade', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ symbol: sym, action, quantity: qty, entry_price: price, notes })
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      msg.innerHTML = `<span style="color:var(--green)">✓ Trade added: ${d.trade.action} ${qty} × ${d.trade.symbol.replace('.NS','')} @ ₹${price}</span>`;
+      document.getElementById('pt-symbol').value = '';
+      document.getElementById('pt-qty').value    = '1';
+      document.getElementById('pt-price').value  = '';
+      document.getElementById('pt-notes').value  = '';
+      setPtAction('Buy');
+      loadPaperPortfolio(false);
+    } else {
+      msg.innerHTML = `<span style="color:var(--red)">✕ ${d.error}</span>`;
+    }
+  }).catch(() => msg.innerHTML = '<span style="color:var(--red)">Network error.</span>');
+}
+
+// ── Close Position Modal ───────────────────────────────────────────
+function openCloseModal(id, symbol, entryPrice, qty, action, currentPrice) {
+  _closingTradeId    = id;
+  _closingEntryPrice = entryPrice;
+  _closingQty        = qty;
+  _closingAction     = action;
+  const sym = symbol.replace('.NS','');
+  document.getElementById('close-trade-info').innerHTML =
+    `<strong style="color:var(--text)">${action} ${qty} × ${sym}</strong> &nbsp;·&nbsp; Entry: ${inr(entryPrice)}`;
+  const priceInput = document.getElementById('close-price-input');
+  priceInput.value = currentPrice > 0 ? currentPrice : '';
+  document.getElementById('close-msg').innerHTML = '';
+  updateClosePnlPreview();
+  document.getElementById('close-trade-modal').classList.add('open');
+  setTimeout(() => priceInput.focus(), 100);
+}
+
+function updateClosePnlPreview() {
+  const ep  = _closingEntryPrice;
+  const qty = _closingQty;
+  const xp  = parseFloat(document.getElementById('close-price-input').value);
+  const el  = document.getElementById('close-pnl-preview');
+  if (!xp || xp <= 0) { el.innerHTML = '<span style="color:var(--muted)">Enter exit price to preview P&L.</span>'; return; }
+  const pnl = _closingAction === 'Buy' ? (xp - ep) * qty : (ep - xp) * qty;
+  const pct = round2((pnl / (ep * qty)) * 100);
+  el.innerHTML = `Estimated P&L: ${pnlHtml(round2(pnl), pct)}`;
+}
+
+document.getElementById('close-price-input').addEventListener('input', updateClosePnlPreview);
+
+function closeCloseModal() {
+  document.getElementById('close-trade-modal').classList.remove('open');
+  _closingTradeId = null;
+}
+
+function confirmClose() {
+  const exitPrice = parseFloat(document.getElementById('close-price-input').value);
+  const msg = document.getElementById('close-msg');
+  if (!exitPrice || exitPrice <= 0) { msg.innerHTML = '<span style="color:var(--red)">Enter a valid exit price.</span>'; return; }
+  msg.innerHTML = '<span style="color:var(--muted)">Closing…</span>';
+  fetch(`/api/paper/trade/${_closingTradeId}/close`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ exit_price: exitPrice })
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      closeCloseModal();
+      loadPaperPortfolio(false);
+    } else {
+      msg.innerHTML = `<span style="color:var(--red)">✕ ${d.error}</span>`;
+    }
+  }).catch(() => msg.innerHTML = '<span style="color:var(--red)">Network error.</span>');
+}
+
+// ── Delete Trade ───────────────────────────────────────────────────
+function deleteTrade(id, isOpen) {
+  if (!confirm('Delete this trade record?')) return;
+  fetch(`/api/paper/trade/${id}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(d => { if (d.success) loadPaperPortfolio(false); });
+}
+
+// ── Closed Trades Toggle ───────────────────────────────────────────
+function toggleClosedTrades() {
+  _closedVisible = !_closedVisible;
+  document.getElementById('pp-closed-section').style.display = _closedVisible ? 'block' : 'none';
+  document.getElementById('pp-closed-toggle').textContent = _closedVisible ? 'Hide ▲' : 'Show ▼';
+}
+
+// ── Capital Modal ──────────────────────────────────────────────────
+function openCapitalModal() {
+  if (_paperData) document.getElementById('capital-input').value = _paperData.capital;
+  document.getElementById('capital-msg').innerHTML = '';
+  document.getElementById('capital-modal').classList.add('open');
+}
+
+function saveCapital() {
+  const cap = parseFloat(document.getElementById('capital-input').value);
+  const msg = document.getElementById('capital-msg');
+  if (!cap || cap <= 0) { msg.innerHTML = '<span style="color:var(--red)">Enter a valid amount.</span>'; return; }
+  fetch('/api/paper/capital', {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ capital: cap })
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      document.getElementById('capital-modal').classList.remove('open');
+      loadPaperPortfolio(false);
+    } else {
+      msg.innerHTML = `<span style="color:var(--red)">✕ ${d.error}</span>`;
+    }
+  }).catch(() => msg.innerHTML = '<span style="color:var(--red)">Network error.</span>');
+}
 </script>
 </body>
 </html>
