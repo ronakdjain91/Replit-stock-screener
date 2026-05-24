@@ -336,6 +336,30 @@
     .pp-del-btn{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s}
     .pp-del-btn:hover{border-color:var(--red);color:var(--red)}
     .pp-note{font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis}
+
+    /* ── STOCK AUTOCOMPLETE DROPDOWN ── */
+    .stock-dropdown{
+      position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:9999;
+      background:var(--surface);border:1px solid var(--accent);border-radius:8px;
+      max-height:210px;overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.55);
+    }
+    .sdi{
+      padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);
+      display:flex;justify-content:space-between;align-items:center;gap:6px;
+      border-bottom:1px solid #141f33;
+    }
+    .sdi:last-child{border-bottom:none}
+    .sdi:hover,.sdi.sdi-active{background:var(--accent);color:#fff}
+    .sdi-sym{font-weight:700;letter-spacing:.3px}
+    .sdi-price{font-size:11px;opacity:.75;white-space:nowrap}
+
+    /* ── ADD TO TRADE BUTTON (in scanner tables) ── */
+    .trade-btn{
+      padding:3px 10px;border-radius:6px;border:1px solid var(--accent);
+      background:transparent;color:var(--accent2);font-size:11px;font-weight:600;
+      cursor:pointer;white-space:nowrap;transition:all .15s;
+    }
+    .trade-btn:hover{background:var(--accent);color:#fff}
   </style>
 </head>
 <body>
@@ -676,7 +700,15 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px">
         <div>
           <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:4px">Stock Symbol</label>
-          <input id="pt-symbol" type="text" placeholder="e.g. RELIANCE" style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none" oninput="this.value=this.value.toUpperCase()" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+          <div style="position:relative">
+            <input id="pt-symbol" type="text" placeholder="e.g. RELIANCE" autocomplete="off"
+              style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none"
+              oninput="this.value=this.value.toUpperCase();filterStockDropdown(this.value)"
+              onfocus="this.style.borderColor='var(--accent)';filterStockDropdown(this.value)"
+              onblur="this.style.borderColor='var(--border)';setTimeout(hideStockDropdown,180)"
+              onkeydown="stockDropdownKey(event)"/>
+            <div id="stock-dropdown" class="stock-dropdown" style="display:none"></div>
+          </div>
         </div>
         <div>
           <label style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;display:block;margin-bottom:4px">Action</label>
@@ -1040,8 +1072,8 @@ function loadData(name) {
     const meta = document.getElementById('meta-' + name);
     if (d.generated_at) meta.textContent = `Last scan: ${d.generated_at} · Period: ${d.params?.period || ''} ${d.params?.interval || ''}`;
     if (d.rows && d.rows.length) {
-      if (name === 'tech') buildTechTable(d.rows);
-      else buildFundTable(d.rows);
+      if (name === 'tech') { buildTechTable(d.rows); addToStockList(d.rows, 'Stock', 'Price'); }
+      else                 { buildFundTable(d.rows);  addToStockList(d.rows, 'Symbol', 'Price'); }
     }
   });
 }
@@ -1127,7 +1159,6 @@ function buildTechTable(rows) {
 
   techTable = $('#tech-table').DataTable({
     data: rows,
-    stateSave: true,
     scrollX: true,
     fixedColumns: { start: fixedCols },
     pageLength: 25,
@@ -1223,7 +1254,17 @@ function buildTechTable(rows) {
           return d ? `<a href="${d}" target="_blank" class="tv-link">↗ Chart</a>` : '—';
         }
       },
-    ]
+    ],
+    stateSave: true,
+    stateLoadCallback: function() { return null; },
+    createdRow: function(row, data) {
+      const sym    = (data.Stock || '').replace('.NS', '');
+      const price  = data.Price  || 0;
+      const action = (data.Consensus || '').toLowerCase().includes('sell') ? 'Sell' : 'Buy';
+      $('td:first-child', row).append(
+        `<button class="trade-btn" onclick="openAddTradeFromScanner('${sym}',${price},'${action}')">+ Trade</button>`
+      );
+    }
   });
 
   // Custom search filters
@@ -1319,7 +1360,6 @@ function buildFundTable(rows) {
 
   fundTable = $('#fund-table').DataTable({
     data: rows,
-    stateSave: true,
     scrollX: true,
     fixedColumns: { start: 1 },
     pageLength: 25,
@@ -1404,7 +1444,17 @@ function buildFundTable(rows) {
           return d ? `<a href="${d}" target="_blank" class="tv-link">↗ Chart</a>` : '—';
         }
       },
-    ]
+    ],
+    stateSave: true,
+    stateLoadCallback: function() { return null; },
+    createdRow: function(row, data) {
+      const sym    = (data.Symbol || '').replace('.NS', '');
+      const price  = data.Price || 0;
+      const action = (data.Recommendation || '').toLowerCase() === 'sell' ? 'Sell' : 'Buy';
+      $('td:first-child', row).append(
+        `<button class="trade-btn" onclick="openAddTradeFromScanner('${sym}',${price},'${action}')">+ Trade</button>`
+      );
+    }
   });
 
   // Custom fund search filters
@@ -1605,6 +1655,129 @@ function downloadTemplate() {
   a.download = 'stock_list_template.csv'; a.click();
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// STOCK AUTOCOMPLETE DROPDOWN
+// ═══════════════════════════════════════════════════════════════════
+
+let _masterStocks = {};   // { 'RELIANCE': { price: 2400.5 }, ... }
+let _ddActiveIdx  = -1;
+
+function addToStockList(rows, symField, priceField) {
+  rows.forEach(r => {
+    const sym   = (r[symField] || '').replace('.NS', '');
+    const price = r[priceField] || null;
+    if (sym && !_masterStocks[sym]) _masterStocks[sym] = { price };
+    else if (sym && price)          _masterStocks[sym].price = price;
+  });
+}
+
+function filterStockDropdown(query) {
+  const dd = document.getElementById('stock-dropdown');
+  const q  = (query || '').trim().toUpperCase();
+  if (!q) { dd.style.display = 'none'; return; }
+
+  const keys = Object.keys(_masterStocks).filter(s => s.includes(q)).sort((a, b) => {
+    const ai = a.indexOf(q), bi = b.indexOf(q);
+    if (ai !== bi) return ai - bi;
+    return a.localeCompare(b);
+  }).slice(0, 20);
+
+  if (!keys.length) { dd.style.display = 'none'; return; }
+
+  _ddActiveIdx = -1;
+  dd.innerHTML = keys.map(sym => {
+    const price = _masterStocks[sym]?.price;
+    const pStr  = price ? `<span class="sdi-price">₹${parseFloat(price).toLocaleString('en-IN')}</span>` : '';
+    return `<div class="sdi" onmousedown="selectStockDropdown('${sym}',${price || 0})">
+              <span class="sdi-sym">${sym}</span>${pStr}
+            </div>`;
+  }).join('');
+  dd.style.display = 'block';
+}
+
+function selectStockDropdown(sym, price) {
+  document.getElementById('pt-symbol').value = sym;
+  hideStockDropdown();
+  if (price > 0) {
+    document.getElementById('pt-price').value = price;
+    document.getElementById('pt-msg').innerHTML =
+      `<span style="color:var(--green)">Price from scanner: ₹${parseFloat(price).toLocaleString('en-IN')}</span>`;
+  }
+}
+
+function hideStockDropdown() {
+  const dd = document.getElementById('stock-dropdown');
+  if (dd) dd.style.display = 'none';
+  _ddActiveIdx = -1;
+}
+
+function stockDropdownKey(e) {
+  const dd    = document.getElementById('stock-dropdown');
+  const items = dd.querySelectorAll('.sdi');
+  if (!items.length || dd.style.display === 'none') return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _ddActiveIdx = Math.min(_ddActiveIdx + 1, items.length - 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _ddActiveIdx = Math.max(_ddActiveIdx - 1, 0);
+  } else if (e.key === 'Enter' && _ddActiveIdx >= 0) {
+    e.preventDefault();
+    items[_ddActiveIdx].dispatchEvent(new MouseEvent('mousedown'));
+    return;
+  } else if (e.key === 'Escape') {
+    hideStockDropdown(); return;
+  } else { return; }
+
+  items.forEach((el, i) => el.classList.toggle('sdi-active', i === _ddActiveIdx));
+  if (_ddActiveIdx >= 0) items[_ddActiveIdx].scrollIntoView({ block: 'nearest' });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// OPEN PAPER TRADE FORM FROM SCANNER TABLES
+// ═══════════════════════════════════════════════════════════════════
+
+function openAddTradeFromScanner(symbol, price, action) {
+  // Switch to Paper Trade tab
+  const paperBtn = [...document.querySelectorAll('.tab-btn')]
+    .find(b => b.textContent.includes('Paper Trade'));
+  if (paperBtn && !paperBtn.classList.contains('active')) {
+    paperBtn.click();
+    loadPaperPortfolio(false);
+  }
+
+  // Small delay to let tab switch render
+  setTimeout(() => {
+    // Ensure form is visible
+    document.getElementById('add-trade-form').style.display = 'block';
+    // Scroll form into view
+    document.getElementById('add-trade-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Pre-fill fields
+    const symInput = document.getElementById('pt-symbol');
+    symInput.value = symbol;
+    symInput.style.borderColor = 'var(--accent)';
+    hideStockDropdown();
+
+    if (price > 0) {
+      document.getElementById('pt-price').value = price;
+      document.getElementById('pt-msg').innerHTML =
+        `<span style="color:var(--green)">Pre-filled from scanner: ₹${parseFloat(price).toLocaleString('en-IN')}</span>`;
+    }
+
+    setPtAction(action || 'Buy');
+
+    // Flash the form to draw attention
+    const form = document.getElementById('add-trade-form');
+    form.style.transition = 'box-shadow .3s';
+    form.style.boxShadow  = '0 0 0 3px var(--accent)';
+    setTimeout(() => { form.style.boxShadow = 'none'; }, 600);
+
+    document.getElementById('pt-qty').focus();
+  }, 80);
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 document.getElementById('stocks-modal').addEventListener('click', function(e) {
   if (e.target === this) closeStocksModal();
@@ -1615,6 +1788,11 @@ document.getElementById('close-trade-modal').addEventListener('click', function(
 document.getElementById('capital-modal').addEventListener('click', function(e) {
   if (e.target === this) e.currentTarget.classList.remove('open');
 });
+
+// Clear ALL stale DataTables saved states (handles any URL pattern)
+try {
+  Object.keys(localStorage).filter(k => k.startsWith('DataTables_')).forEach(k => localStorage.removeItem(k));
+} catch(e) {}
 
 initFilters();
 window.addEventListener('resize', initFilters);
