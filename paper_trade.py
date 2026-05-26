@@ -6,7 +6,8 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime
 
-PAPER_FILE    = "paper_trades.json"
+_DATA_DIR  = os.environ.get("DATA_DIR", ".")
+PAPER_FILE = os.path.join(_DATA_DIR, "paper_trades.json")
 DEFAULT_CAPITAL = 100000.0
 
 

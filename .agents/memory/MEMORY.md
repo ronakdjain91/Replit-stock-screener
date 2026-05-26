@@ -1,0 +1,3 @@
+- [Signals tab architecture](signals-tab.md) — Tech+Fund merged into one "Buy/Sell Calls" tab via /api/data/signals endpoint.
+- [4-signal consensus system](consensus-signals.md) — 4 signals (MACD, RSI, UT Bot, EMA 9/21 cross); Strong Buy=4/4, Buy=3/4.
+- [Render.com persistence](render-persistence.md) — paper_trades.json must use DATA_DIR env var; set DATA_DIR=/var/data with persistent disk.

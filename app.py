@@ -164,8 +164,10 @@ def load_tech_csv():
             'MACD Signal':  _str_or(r, 'MACD Signal', '---'),
             'RSI Signal':   _str_or(r, 'RSI Signal',  '---'),
             'UT Bot':       _str_or(r, 'UT Bot',       '---'),
+            'EMA Cross':    _str_or(r, 'EMA Cross',    '---'),
             'Beta':         _float_or_none(r.get('Beta', '')),
             '200 SMA':      _float_or_none(r.get('200 SMA', '')),
+            '50 SMA':       _float_or_none(r.get('50 SMA', '')),
             'Last Scanned': _str_or(r, 'Last Scanned', ''),
             'Chart':        _str_or(r, 'Chart', ''),
         })
@@ -231,6 +233,68 @@ def data_fund():
     mtime = os.path.getmtime(FUND_CSV) if os.path.exists(FUND_CSV) else None
     generated_at = datetime.fromtimestamp(mtime).strftime("%d %b %Y, %H:%M") if mtime else None
     return safe_jsonify({"rows": rows or [], "generated_at": generated_at, "params": scan_params["fund"]})
+
+
+@app.route("/api/data/signals")
+def data_signals():
+    tech_rows = scan_results["tech"] if scan_results["tech"] is not None else load_tech_csv()
+    fund_rows = scan_results["fund"] if scan_results["fund"] is not None else load_fund_csv()
+
+    # Build fund lookup keyed by symbol (with and without .NS)
+    fund_map = {}
+    for row in (fund_rows or []):
+        sym = row.get('Symbol', '')
+        if sym:
+            fund_map[sym] = row
+            fund_map[sym.replace('.NS', '')] = row
+
+    merged = []
+    for tr in (tech_rows or []):
+        stock = tr.get('Stock', '')
+        fr = fund_map.get(stock) or fund_map.get(stock.replace('.NS', '')) or {}
+        merged.append({
+            'Stock':          tr.get('Stock'),
+            'Price':          tr.get('Price'),
+            '% Change':       tr.get('% Change'),
+            'Consensus':      tr.get('Consensus'),
+            'Strength':       tr.get('Strength'),
+            'Trend':          tr.get('Trend'),
+            'RSI':            tr.get('RSI'),
+            'MACD Signal':    tr.get('MACD Signal'),
+            'UT Bot':         tr.get('UT Bot'),
+            'EMA Cross':      tr.get('EMA Cross'),
+            'Vol Ratio':      tr.get('Vol Ratio'),
+            'Vol Spike':      tr.get('Vol Spike'),
+            'Beta':           tr.get('Beta'),
+            '200 SMA':        tr.get('200 SMA'),
+            '50 SMA':         tr.get('50 SMA'),
+            'Last Scanned':   tr.get('Last Scanned'),
+            'Chart':          tr.get('Chart'),
+            'Fund Score':     fr.get('Fund Score'),
+            'Final Score':    fr.get('Final Score'),
+            'Recommendation': fr.get('Recommendation'),
+            'Sector':         fr.get('Sector'),
+            'P/E':            fr.get('P/E'),
+            'D/E':            fr.get('D/E'),
+            'ROE':            fr.get('ROE'),
+        })
+
+    tech_mtime = os.path.getmtime(TECH_CSV) if os.path.exists(TECH_CSV) else None
+    fund_mtime = os.path.getmtime(FUND_CSV) if os.path.exists(FUND_CSV) else None
+    mtimes = [t for t in [tech_mtime, fund_mtime] if t is not None]
+    last_mtime = max(mtimes) if mtimes else None
+    generated_at = datetime.fromtimestamp(last_mtime).strftime("%d %b %Y, %H:%M") if last_mtime else None
+    tech_at = datetime.fromtimestamp(tech_mtime).strftime("%d %b, %H:%M") if tech_mtime else None
+    fund_at = datetime.fromtimestamp(fund_mtime).strftime("%d %b, %H:%M") if fund_mtime else None
+
+    return safe_jsonify({
+        "rows":        merged,
+        "generated_at": generated_at,
+        "tech_at":     tech_at,
+        "fund_at":     fund_at,
+        "tech_params": scan_params["tech"],
+        "fund_params": scan_params["fund"],
+    })
 
 
 @app.route("/api/run/<scanner>", methods=["POST"])

@@ -372,52 +372,61 @@
 </header>
 
 <div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('tech',this)">📈 Technical — Nifty 100</button>
-  <button class="tab-btn" onclick="switchTab('fund',this)">🏦 Fund+Tech — Nifty 50</button>
+  <button class="tab-btn active" onclick="switchTab('signals',this)">📊 Buy/Sell Calls</button>
   <button class="tab-btn" onclick="switchTab('paper',this);loadPaperPortfolio(false)">📝 Paper Trade</button>
 </div>
 
 <div class="container">
 
-  <!-- ═══ TECHNICAL TAB ═══ -->
-  <div class="panel active" id="panel-tech">
+  <!-- ═══ SIGNALS TAB (Buy/Sell Calls) ═══ -->
+  <div class="panel active" id="panel-signals">
 
     <div class="stats-row">
-      <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value sv-total" id="st-total">—</div><div class="stat-sub">in results</div></div>
-      <div class="stat-card"><div class="stat-label">Strong Buy</div><div class="stat-value sv-strong" id="st-strong-buy">—</div><div class="stat-sub">3/3 signals</div></div>
-      <div class="stat-card"><div class="stat-label">Buy</div><div class="stat-value sv-buy" id="st-buy">—</div><div class="stat-sub">2/3 signals</div></div>
-      <div class="stat-card"><div class="stat-label">Uptrend</div><div class="stat-value sv-up" id="st-uptrend">—</div><div class="stat-sub">above 200 SMA</div></div>
-      <div class="stat-card"><div class="stat-label">Vol Spike</div><div class="stat-value sv-hold" id="st-vol">—</div><div class="stat-sub">&gt;1.5× avg volume</div></div>
-      <div class="stat-card"><div class="stat-label">Sell Signal</div><div class="stat-value sv-sell" id="st-sell">—</div><div class="stat-sub">2+ sell signals</div></div>
+      <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value sv-total" id="ss-total">—</div><div class="stat-sub">stocks loaded</div></div>
+      <div class="stat-card"><div class="stat-label">Strong Buy</div><div class="stat-value sv-strong" id="ss-strong-buy">—</div><div class="stat-sub">4/4 signals</div></div>
+      <div class="stat-card"><div class="stat-label">Buy</div><div class="stat-value sv-buy" id="ss-buy">—</div><div class="stat-sub">3/4 signals</div></div>
+      <div class="stat-card"><div class="stat-label">Sell</div><div class="stat-value sv-sell" id="ss-sell">—</div><div class="stat-sub">sell signals</div></div>
+      <div class="stat-card"><div class="stat-label">Vol Spike</div><div class="stat-value sv-hold" id="ss-vol">—</div><div class="stat-sub">&gt;1.5× avg volume</div></div>
+      <div class="stat-card"><div class="stat-label">Fund Coverage</div><div class="stat-value sv-up" id="ss-fund">—</div><div class="stat-sub">Nifty 50 scored</div></div>
     </div>
 
     <div class="toolbar">
       <div class="toolbar-top">
         <div>
-          <div class="toolbar-title">MACD · RSI · UT Bot — Consensus Signals</div>
-          <div class="toolbar-meta" id="meta-tech">No scan run yet</div>
+          <div class="toolbar-title">MACD · RSI · UT Bot · EMA — Buy/Sell Calls</div>
+          <div class="toolbar-meta" id="meta-signals">Run Tech and/or Fund scan to see signals</div>
         </div>
         <div class="toolbar-actions">
-          <span class="status-badge s-idle" id="badge-tech">Idle</span>
-          <button class="btn btn-ghost btn-sm sig-only-btn" id="sig-only-tech" onclick="toggleSignalOnly('tech')" title="Show only Buy/Sell consensus stocks">Signal Only</button>
-          <button class="btn btn-primary" id="run-tech" onclick="runScanner('tech')">▶ Run</button>
-          <a href="/api/download/tech" class="btn btn-success">↓ <span>CSV</span></a>
+          <span class="status-badge s-idle" id="badge-tech">Tech</span>
+          <button class="btn btn-ghost btn-sm" id="run-tech" onclick="runScanner('tech')">▶ Tech</button>
+          <span class="status-badge s-idle" id="badge-fund">Fund</span>
+          <button class="btn btn-ghost btn-sm" id="run-fund" onclick="runScanner('fund')">▶ Fund</button>
+          <button class="btn btn-ghost btn-sm sig-only-btn" id="sig-only-signals" onclick="toggleSignalOnly()" title="Show only stocks with Buy/Sell signals">Signal Only</button>
+          <a href="/api/download/tech" class="btn btn-success btn-sm">↓ Tech</a>
+          <a href="/api/download/fund" class="btn btn-success btn-sm">↓ Fund</a>
         </div>
       </div>
 
-      <!-- Progress bar -->
-      <div class="prog-wrap" id="prog-tech">
+      <div class="prog-wrap" id="prog-tech" style="display:none">
         <div class="prog-track"><div class="prog-fill" id="prog-fill-tech" style="width:0%"></div></div>
         <div class="prog-text">
-          <span id="prog-label-tech">Starting scan…</span>
+          <span id="prog-label-tech">Starting tech scan…</span>
           <span id="prog-pct-tech">0%</span>
+        </div>
+      </div>
+      <div class="prog-wrap" id="prog-fund" style="display:none">
+        <div class="prog-track"><div class="prog-fill" id="prog-fill-fund" style="width:0%"></div></div>
+        <div class="prog-text">
+          <span id="prog-label-fund">Starting fund scan…</span>
+          <span id="prog-pct-fund">0%</span>
         </div>
       </div>
 
       <div class="tf-row">
+        <span class="tf-label" style="color:var(--accent2);font-weight:700;min-width:38px">Tech</span>
         <div class="tf-group">
           <span class="tf-label">Period</span>
-          <div class="tf-pills">
+          <div class="tf-pills" id="tech-period-pills">
             <button class="tf-pill" data-val="3mo" onclick="setTechPeriod(this)">3M</button>
             <button class="tf-pill" data-val="6mo" onclick="setTechPeriod(this)">6M</button>
             <button class="tf-pill active" data-val="1y" onclick="setTechPeriod(this)">1Y</button>
@@ -428,26 +437,45 @@
         <div class="tf-sep"></div>
         <div class="tf-group">
           <span class="tf-label">Interval</span>
-          <div class="tf-pills">
+          <div class="tf-pills" id="tech-interval-pills">
             <button class="tf-pill" data-val="1d" onclick="setTechInterval(this)">Daily</button>
             <button class="tf-pill active" data-val="1wk" onclick="setTechInterval(this)">Weekly</button>
             <button class="tf-pill" data-val="1mo" onclick="setTechInterval(this)">Monthly</button>
           </div>
         </div>
+        <div class="tf-sep" style="margin:0 14px"></div>
+        <span class="tf-label" style="color:var(--accent2);font-weight:700;min-width:38px">Fund</span>
+        <div class="tf-group">
+          <span class="tf-label">Period</span>
+          <div class="tf-pills" id="fund-period-pills">
+            <button class="tf-pill" data-val="3mo" onclick="setFundPeriod(this)">3M</button>
+            <button class="tf-pill" data-val="6mo" onclick="setFundPeriod(this)">6M</button>
+            <button class="tf-pill active" data-val="1y" onclick="setFundPeriod(this)">1Y</button>
+            <button class="tf-pill" data-val="2y" onclick="setFundPeriod(this)">2Y</button>
+          </div>
+        </div>
+        <div class="tf-sep"></div>
+        <div class="tf-group">
+          <span class="tf-label">Interval</span>
+          <div class="tf-pills" id="fund-interval-pills">
+            <button class="tf-pill active" data-val="1d" onclick="setFundInterval(this)">Daily</button>
+            <button class="tf-pill" data-val="1wk" onclick="setFundInterval(this)">Weekly</button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- FILTER BAR -->
+    <!-- SIGNALS FILTER BAR -->
     <div class="filter-bar">
-      <button class="filter-toggle" id="ftoggle-tech" onclick="toggleFilters('tech')">
+      <button class="filter-toggle" id="ftoggle-signals" onclick="toggleFilters('signals')">
         <span>⚡ Filters</span>
-        <span class="filter-active-count" id="fcount-tech"></span>
-        <span style="margin-left:auto" id="farrow-tech">▼</span>
+        <span class="filter-active-count" id="fcount-signals"></span>
+        <span style="margin-left:auto" id="farrow-signals">▼</span>
       </button>
-      <div class="filter-inner" id="finner-tech">
+      <div class="filter-inner" id="finner-signals">
         <div class="filter-group">
           <label>Consensus</label>
-          <select class="fsel" id="f-consensus" onchange="applyTechFilters()">
+          <select class="fsel" id="f-consensus" onchange="applySignalsFilters()">
             <option value="">All</option>
             <option value="Strong Buy">Strong Buy</option>
             <option value="Buy">Buy</option>
@@ -459,7 +487,7 @@
         </div>
         <div class="filter-group">
           <label>Trend</label>
-          <select class="fsel" id="f-trend" onchange="applyTechFilters()">
+          <select class="fsel" id="f-trend" onchange="applySignalsFilters()">
             <option value="">All</option>
             <option value="Uptrend">Uptrend</option>
             <option value="Downtrend">Downtrend</option>
@@ -467,193 +495,58 @@
         </div>
         <div class="filter-group">
           <label>Vol Spike</label>
-          <select class="fsel" id="f-volspike" onchange="applyTechFilters()">
+          <select class="fsel" id="f-volspike" onchange="applySignalsFilters()">
             <option value="">All</option>
             <option value="Yes">Yes</option>
             <option value="No">No</option>
           </select>
         </div>
         <div class="filter-group">
-          <label>MACD Signal</label>
-          <select class="fsel" id="f-macd" onchange="applyTechFilters()">
-            <option value="">All</option><option value="Buy">Buy</option><option value="Sell">Sell</option><option value="---">Neutral</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>RSI Signal</label>
-          <select class="fsel" id="f-rsi" onchange="applyTechFilters()">
-            <option value="">All</option><option value="Buy">Buy</option><option value="Sell">Sell</option><option value="---">Neutral</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>UT Bot Signal</label>
-          <select class="fsel" id="f-ut" onchange="applyTechFilters()">
-            <option value="">All</option><option value="Buy">Buy</option><option value="Sell">Sell</option><option value="---">Neutral</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>RSI Zone</label>
-          <select class="fsel" id="f-rsi-range" onchange="applyTechFilters()">
+          <label>Fund Rec</label>
+          <select class="fsel" id="f-rec" onchange="applySignalsFilters()">
             <option value="">All</option>
-            <option value="oversold">Oversold (&lt;30)</option>
-            <option value="healthy">Healthy (30–70)</option>
-            <option value="overbought">Overbought (&gt;70)</option>
+            <option value="Buy">Buy</option>
+            <option value="Hold">Hold</option>
+            <option value="Sell">Sell</option>
           </select>
         </div>
         <div class="filter-group">
           <label>% Move</label>
-          <select class="fsel" id="f-pct" onchange="applyTechFilters()">
+          <select class="fsel" id="f-pct" onchange="applySignalsFilters()">
             <option value="">All</option>
             <option value="up1">Up &gt;1%</option>
             <option value="up3">Up &gt;3%</option>
             <option value="dn1">Down &gt;1%</option>
           </select>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="clearTechFilters()">✕ Clear all</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearSignalsFilters()">✕ Clear all</button>
       </div>
     </div>
 
     <div class="table-card">
-      <div id="tech-placeholder" class="empty-state">
+      <div id="signals-placeholder" class="empty-state">
         <div class="icon">📊</div>
         <p>No scan data yet.</p>
-        <small>Select a timeframe and click "Run".</small>
+        <small>Click ▶ Tech and/or ▶ Fund above to run a scan.</small>
       </div>
-      <div id="tech-table-wrap" style="display:none">
-        <table id="tech-table" class="dt" style="width:100%">
+      <div id="signals-table-wrap" style="display:none">
+        <table id="signals-table" class="dt" style="width:100%">
           <thead>
             <tr>
               <th>Stock</th>
+              <th>Price</th>
+              <th>% Chg</th>
               <th>Consensus</th>
               <th>Strength</th>
               <th>Trend</th>
-              <th>Vol Spike</th>
-              <th>Price</th>
-              <th>% Chg</th>
               <th>RSI</th>
-              <th>MACD Hist</th>
-              <th>MACD Sig</th>
-              <th>RSI Sig</th>
+              <th>MACD</th>
               <th>UT Bot</th>
-              <th>Beta</th>
-              <th>200 SMA</th>
-              <th>Last Scanned</th>
-              <th>Chart</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-  </div><!-- /panel-tech -->
-
-  <!-- ═══ FUND+TECH TAB ═══ -->
-  <div class="panel" id="panel-fund">
-
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value sv-total" id="fs-total">—</div><div class="stat-sub">in results</div></div>
-      <div class="stat-card"><div class="stat-label">Buy</div><div class="stat-value sv-buy" id="fs-buy">—</div><div class="stat-sub">recommended</div></div>
-      <div class="stat-card"><div class="stat-label">Hold</div><div class="stat-value sv-hold" id="fs-hold">—</div><div class="stat-sub">recommended</div></div>
-      <div class="stat-card"><div class="stat-label">Sell</div><div class="stat-value sv-sell" id="fs-sell">—</div><div class="stat-sub">recommended</div></div>
-      <div class="stat-card"><div class="stat-label">Avg Fund Score</div><div class="stat-value sv-up" id="fs-fund-avg">—</div><div class="stat-sub">out of 5</div></div>
-      <div class="stat-card"><div class="stat-label">Avg Tech Score</div><div class="stat-value sv-total" id="fs-tech-avg">—</div><div class="stat-sub">out of 5</div></div>
-    </div>
-
-    <div class="toolbar">
-      <div class="toolbar-top">
-        <div>
-          <div class="toolbar-title">Fundamental + Technical Scorer</div>
-          <div class="toolbar-meta" id="meta-fund">No scan run yet</div>
-        </div>
-        <div class="toolbar-actions">
-          <span class="status-badge s-idle" id="badge-fund">Idle</span>
-          <button class="btn btn-primary" id="run-fund" onclick="runScanner('fund')">▶ Run</button>
-          <a href="/api/download/fund" class="btn btn-success">↓ <span>CSV</span></a>
-        </div>
-      </div>
-
-      <!-- Progress bar -->
-      <div class="prog-wrap" id="prog-fund">
-        <div class="prog-track"><div class="prog-fill" id="prog-fill-fund" style="width:0%"></div></div>
-        <div class="prog-text">
-          <span id="prog-label-fund">Starting scan…</span>
-          <span id="prog-pct-fund">0%</span>
-        </div>
-      </div>
-
-      <div class="tf-row">
-        <div class="tf-group">
-          <span class="tf-label">Period</span>
-          <div class="tf-pills">
-            <button class="tf-pill" data-val="3mo" onclick="setFundPeriod(this)">3M</button>
-            <button class="tf-pill" data-val="6mo" onclick="setFundPeriod(this)">6M</button>
-            <button class="tf-pill active" data-val="1y" onclick="setFundPeriod(this)">1Y</button>
-            <button class="tf-pill" data-val="2y" onclick="setFundPeriod(this)">2Y</button>
-          </div>
-        </div>
-        <div class="tf-sep"></div>
-        <div class="tf-group">
-          <span class="tf-label">Interval</span>
-          <div class="tf-pills">
-            <button class="tf-pill active" data-val="1d" onclick="setFundInterval(this)">Daily</button>
-            <button class="tf-pill" data-val="1wk" onclick="setFundInterval(this)">Weekly</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- FUND FILTER BAR -->
-    <div class="filter-bar">
-      <button class="filter-toggle" id="ftoggle-fund" onclick="toggleFilters('fund')">
-        <span>⚡ Filters</span>
-        <span class="filter-active-count" id="fcount-fund"></span>
-        <span style="margin-left:auto" id="farrow-fund">▼</span>
-      </button>
-      <div class="filter-inner" id="finner-fund">
-        <div class="filter-group">
-          <label>Recommendation</label>
-          <select class="fsel" id="f-rec" onchange="applyFundFilters()">
-            <option value="">All</option><option value="Buy">Buy</option><option value="Hold">Hold</option><option value="Sell">Sell</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>Min Fund Score</label>
-          <select class="fsel" id="f-fund-score" onchange="applyFundFilters()">
-            <option value="0">Any</option><option value="2">≥ 2</option><option value="3">≥ 3</option><option value="4">≥ 4</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>Min Final Score</label>
-          <select class="fsel" id="f-final-score" onchange="applyFundFilters()">
-            <option value="0">Any</option><option value="0.4">≥ 0.4</option><option value="0.6">≥ 0.6</option><option value="0.7">≥ 0.7</option>
-          </select>
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="clearFundFilters()">✕ Clear all</button>
-      </div>
-    </div>
-
-    <div class="table-card">
-      <div id="fund-placeholder" class="empty-state">
-        <div class="icon">🏦</div>
-        <p>No scan data yet.</p>
-        <small>Click "Run" to start the fundamental scan.</small>
-      </div>
-      <div id="fund-table-wrap" style="display:none">
-        <table id="fund-table" class="dt" style="width:100%">
-          <thead>
-            <tr>
-              <th>Symbol</th>
-              <th>Sector</th>
-              <th>Price</th>
-              <th>P/E</th>
-              <th>Sect Med P/E</th>
-              <th>D/E</th>
-              <th>ROE %</th>
-              <th>RSI</th>
+              <th>EMA X</th>
+              <th>Vol</th>
               <th>Fund Score</th>
-              <th>Tech Score</th>
-              <th>Final Score</th>
               <th>Rec</th>
+              <th>Final Score</th>
               <th>Chart</th>
             </tr>
           </thead>
@@ -661,7 +554,7 @@
         </table>
       </div>
     </div>
-  </div><!-- /panel-fund -->
+  </div><!-- /panel-signals -->
 
 
   <!-- ═══ PAPER TRADE TAB ═══ -->
@@ -939,10 +832,11 @@
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
-  tech: { period:'1y', interval:'1wk', signalOnly: false },
-  fund: { period:'1y', interval:'1d'  }
+  tech: { period:'1y', interval:'1wk' },
+  fund: { period:'1y', interval:'1d'  },
+  signalOnly: false,
 };
-let techTable = null, fundTable = null;
+let signalsTable = null;
 let techPollTimer = null, fundPollTimer = null;
 let techProgTimer = null, fundProgTimer = null;
 
@@ -952,8 +846,7 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
   btn.classList.add('active');
-  if (name === 'tech' && techTable) setTimeout(() => techTable.columns.adjust().draw(false), 50);
-  if (name === 'fund' && fundTable) setTimeout(() => fundTable.columns.adjust().draw(false), 50);
+  if (name === 'signals' && signalsTable) setTimeout(() => signalsTable.columns.adjust().draw(false), 50);
 }
 
 function switchModalTab(name, btn) {
@@ -964,17 +857,16 @@ function switchModalTab(name, btn) {
 }
 
 // ── Timeframe ──────────────────────────────────────────────────────────────
-function setTechPeriod(btn)   { document.querySelectorAll('#panel-tech .tf-pills:first-of-type .tf-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.tech.period=btn.dataset.val; }
-function setTechInterval(btn) { document.querySelectorAll('#panel-tech .tf-pills:last-of-type  .tf-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.tech.interval=btn.dataset.val; }
-function setFundPeriod(btn)   { document.querySelectorAll('#panel-fund .tf-pills:first-of-type .tf-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.fund.period=btn.dataset.val; }
-function setFundInterval(btn) { document.querySelectorAll('#panel-fund .tf-pills:last-of-type  .tf-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.fund.interval=btn.dataset.val; }
+function setTechPeriod(btn)   { document.querySelectorAll('#tech-period-pills   .tf-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.tech.period   =btn.dataset.val; }
+function setTechInterval(btn) { document.querySelectorAll('#tech-interval-pills .tf-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.tech.interval =btn.dataset.val; }
+function setFundPeriod(btn)   { document.querySelectorAll('#fund-period-pills   .tf-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.fund.period   =btn.dataset.val; }
+function setFundInterval(btn) { document.querySelectorAll('#fund-interval-pills .tf-pill').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); state.fund.interval =btn.dataset.val; }
 
 // ── Signal Only toggle ─────────────────────────────────────────────────────
-function toggleSignalOnly(name) {
-  state[name].signalOnly = !state[name].signalOnly;
-  const btn = document.getElementById('sig-only-' + name);
-  btn.classList.toggle('active', state[name].signalOnly);
-  if (name === 'tech') applyTechFilters();
+function toggleSignalOnly() {
+  state.signalOnly = !state.signalOnly;
+  document.getElementById('sig-only-signals').classList.toggle('active', state.signalOnly);
+  applySignalsFilters();
 }
 
 // ── Status badge ───────────────────────────────────────────────────────────
@@ -1068,12 +960,15 @@ function pollStatus(name) {
 
 // ── Load data ──────────────────────────────────────────────────────────────
 function loadData(name) {
-  fetch('/api/data/' + name).then(r => r.json()).then(d => {
-    const meta = document.getElementById('meta-' + name);
-    if (d.generated_at) meta.textContent = `Last scan: ${d.generated_at} · Period: ${d.params?.period || ''} ${d.params?.interval || ''}`;
+  fetch('/api/data/signals').then(r => r.json()).then(d => {
+    const meta  = document.getElementById('meta-signals');
+    const parts = [];
+    if (d.tech_at) parts.push(`Tech: ${d.tech_at}${d.tech_params ? ' ('+d.tech_params.period+' '+d.tech_params.interval+')' : ''}`);
+    if (d.fund_at) parts.push(`Fund: ${d.fund_at}`);
+    meta.textContent = parts.length ? parts.join(' · ') : 'Run Tech and/or Fund scan to see signals';
     if (d.rows && d.rows.length) {
-      if (name === 'tech') { buildTechTable(d.rows); addToStockList(d.rows, 'Stock', 'Price'); }
-      else                 { buildFundTable(d.rows);  addToStockList(d.rows, 'Symbol', 'Price'); }
+      buildSignalsTable(d.rows);
+      addToStockList(d.rows, 'Stock', 'Price');
     }
   });
 }
@@ -1096,11 +991,11 @@ function strengthPips(n, consensus) {
   const isBuy  = consensus && consensus.includes('Buy');
   const isSell = consensus && consensus.includes('Sell');
   let html = '<span class="strength-pips">';
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const on = i < n;
     html += `<span class="pip ${on ? (isSell ? 'on-sell' : 'on-buy') : ''}"></span>`;
   }
-  html += `</span> <span style="font-size:11px;color:var(--muted)">${n}/3</span>`;
+  html += `</span> <span style="font-size:11px;color:var(--muted)">${n}/4</span>`;
   return html;
 }
 
@@ -1146,51 +1041,65 @@ function scoreBar(v, max) {
   </div>`;
 }
 
-// ── Tech table ─────────────────────────────────────────────────────────────
-function buildTechTable(rows) {
-  buildTechStats(rows);
-  document.getElementById('tech-placeholder').style.display = 'none';
-  document.getElementById('tech-table-wrap').style.display  = 'block';
+// ── Signals table ──────────────────────────────────────────────────────────
+function buildSignalsStats(rows) {
+  document.getElementById('ss-total').textContent      = rows.length;
+  document.getElementById('ss-strong-buy').textContent = rows.filter(r => r['Consensus'] === 'Strong Buy').length;
+  document.getElementById('ss-buy').textContent        = rows.filter(r => r['Consensus'] === 'Buy').length;
+  document.getElementById('ss-sell').textContent       = rows.filter(r => r['Consensus'] === 'Sell' || r['Consensus'] === 'Strong Sell').length;
+  document.getElementById('ss-vol').textContent        = rows.filter(r => r['Vol Spike'] === 'Yes').length;
+  document.getElementById('ss-fund').textContent       = rows.filter(r => r['Recommendation'] && r['Recommendation'] !== '---').length;
+}
 
-  if (techTable) { techTable.clear().rows.add(rows).draw(false); return; }
+function buildSignalsTable(rows) {
+  buildSignalsStats(rows);
+  document.getElementById('signals-placeholder').style.display = 'none';
+  document.getElementById('signals-table-wrap').style.display  = 'block';
 
-  const isMobile = window.innerWidth < 768;
-  const fixedCols = isMobile ? 3 : 1;
+  if (signalsTable) { signalsTable.clear().rows.add(rows).draw(false); return; }
 
-  techTable = $('#tech-table').DataTable({
+  signalsTable = $('#signals-table').DataTable({
     data: rows,
     scrollX: true,
-    fixedColumns: { start: fixedCols },
+    fixedColumns: { start: 1 },
     pageLength: 25,
-    order: [[1, 'asc']],
+    order: [[3, 'asc']],
     dom: 'Blfrtip',
     buttons: [{
       extend: 'csvHtml5',
       text: '⬇ Export CSV',
-      title: 'nifty_technical_signals',
+      title: 'nifty_signals',
       exportOptions: { columns: ':not(:last-child)' }
     }],
     columns: [
       // 0: Stock
       { data: 'Stock', render: (d, t) => {
-          if (t !== 'display') return d;
-          const sym = d.replace('.NS','');
+          if (t !== 'display') return d || '';
+          const sym = (d || '').replace('.NS','');
           return `<div class="stock-name">${sym}</div><div class="stock-sub">${d}</div>`;
         }
       },
-      // 1: Consensus
+      // 1: Price
+      { data: 'Price', render: (d, t) => {
+          if (t !== 'display') return d ?? 0;
+          return d !== null ? `₹${d.toLocaleString('en-IN')}` : '—';
+        }
+      },
+      // 2: % Chg
+      { data: '% Change', render: (d, t) => t !== 'display' ? (d ?? 0) : pctHtml(d) },
+      // 3: Consensus
       { data: 'Consensus', render: (d, t) => {
           if (t !== 'display') return d || 'Neutral';
           return consensusBadge(d);
         }
       },
-      // 2: Strength
+      // 4: Strength
       { data: 'Strength', render: (d, t, row) => {
           if (t !== 'display') return d ?? 0;
           return strengthPips(d ?? 0, row.Consensus);
         }
       },
-      // 3: Trend
+      // 5: Trend
       { data: 'Trend', render: (d, t) => {
           if (t !== 'display') return d || '---';
           if (d === 'Uptrend')   return `<span class="trend-up">↑ Uptrend</span>`;
@@ -1198,57 +1107,43 @@ function buildTechTable(rows) {
           return '<span style="color:var(--muted)">—</span>';
         }
       },
-      // 4: Vol Spike
-      { data: 'Vol Ratio', render: (d, t, row) => {
+      // 6: RSI
+      { data: 'RSI', render: (d, t) => t !== 'display' ? (d ?? 0) : rsiColor(d) },
+      // 7: MACD Signal
+      { data: 'MACD Signal', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
+      // 8: UT Bot
+      { data: 'UT Bot', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
+      // 9: EMA Cross
+      { data: 'EMA Cross', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
+      // 10: Vol
+      { data: 'Vol Ratio', render: (d, t) => {
           if (t !== 'display') return d ?? 0;
           return volBar(d);
         }
       },
-      // 5: Price
-      { data: 'Price', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          return d !== null ? `₹${d.toLocaleString('en-IN')}` : '—';
+      // 11: Fund Score
+      { data: 'Fund Score', render: (d, t) => {
+          if (t !== 'display') return d ?? -1;
+          return (d !== null && d !== undefined) ? scoreBar(d, 5) : '<span style="color:var(--muted)">—</span>';
         }
       },
-      // 6: % Change
-      { data: '% Change', render: (d, t) => t !== 'display' ? (d ?? 0) : pctHtml(d) },
-      // 7: RSI
-      { data: 'RSI', render: (d, t) => t !== 'display' ? (d ?? 0) : rsiColor(d) },
-      // 8: MACD Hist
-      { data: 'MACD Hist', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          if (d === null || d === undefined) return '—';
-          const color = d > 0 ? 'var(--green)' : 'var(--red)';
-          return `<span style="color:${color};font-weight:600">${d}</span>`;
+      // 12: Rec
+      { data: 'Recommendation', render: (d, t) => {
+          if (t !== 'display') return d || '---';
+          if (!d || d === '---') return '<span style="color:var(--muted)">—</span>';
+          if (d === 'Buy')  return `<span class="sig sig-buy">Buy</span>`;
+          if (d === 'Sell') return `<span class="sig sig-sell">Sell</span>`;
+          if (d === 'Hold') return `<span class="sig sig-hold">Hold</span>`;
+          return '<span style="color:var(--muted)">—</span>';
         }
       },
-      // 9: MACD Signal
-      { data: 'MACD Signal', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
-      // 10: RSI Signal
-      { data: 'RSI Signal', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
-      // 11: UT Bot
-      { data: 'UT Bot', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
-      // 12: Beta
-      { data: 'Beta', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          if (d === null || d === undefined) return '—';
-          const color = d > 1.2 ? 'var(--orange)' : d < 0.8 ? 'var(--accent2)' : 'var(--muted2)';
-          return `<span style="color:${color}">${d}</span>`;
+      // 13: Final Score
+      { data: 'Final Score', render: (d, t) => {
+          if (t !== 'display') return d ?? -1;
+          return (d !== null && d !== undefined) ? scoreBar(d, 1) : '<span style="color:var(--muted)">—</span>';
         }
       },
-      // 13: 200 SMA
-      { data: '200 SMA', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          return d !== null && d !== undefined ? `₹${d.toLocaleString('en-IN')}` : '—';
-        }
-      },
-      // 14: Last Scanned
-      { data: 'Last Scanned', render: (d, t) => {
-          if (t !== 'display') return d || '';
-          return d ? `<span style="font-size:11px;color:var(--muted)">${d}</span>` : '—';
-        }
-      },
-      // 15: Chart
+      // 14: Chart
       { data: 'Chart', orderable: false, render: (d, t) => {
           if (t !== 'display') return '';
           return d ? `<a href="${d}" target="_blank" class="tv-link">↗ Chart</a>` : '—';
@@ -1267,52 +1162,29 @@ function buildTechTable(rows) {
     }
   });
 
-  // Custom search filters
+  // Custom signals search filter
   $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-    if (settings.nTable.id !== 'tech-table') return true;
-    const row = techTable.row(dataIndex).data();
+    if (settings.nTable.id !== 'signals-table') return true;
+    const row = signalsTable.row(dataIndex).data();
     if (!row) return true;
 
-    // Signal Only
-    if (state.tech.signalOnly) {
+    if (state.signalOnly) {
       const c = row['Consensus'] || '';
       if (!['Strong Buy','Buy','Sell','Strong Sell'].includes(c)) return false;
     }
 
-    // Consensus filter
     const fCons = document.getElementById('f-consensus').value;
     if (fCons && row['Consensus'] !== fCons) return false;
 
-    // Trend filter
     const fTrend = document.getElementById('f-trend').value;
     if (fTrend && row['Trend'] !== fTrend) return false;
 
-    // Vol spike filter
     const fVol = document.getElementById('f-volspike').value;
     if (fVol && row['Vol Spike'] !== fVol) return false;
 
-    // MACD filter
-    const fMacd = document.getElementById('f-macd').value;
-    if (fMacd && row['MACD Signal'] !== fMacd) return false;
+    const fRec = document.getElementById('f-rec').value;
+    if (fRec && row['Recommendation'] !== fRec) return false;
 
-    // RSI signal filter
-    const fRsi = document.getElementById('f-rsi').value;
-    if (fRsi && row['RSI Signal'] !== fRsi) return false;
-
-    // UT Bot filter
-    const fUt = document.getElementById('f-ut').value;
-    if (fUt && row['UT Bot'] !== fUt) return false;
-
-    // RSI range filter
-    const fRange = document.getElementById('f-rsi-range').value;
-    if (fRange) {
-      const r = row['RSI'];
-      if (fRange === 'oversold'   && !(r !== null && r < 30))         return false;
-      if (fRange === 'healthy'    && !(r !== null && r >= 30 && r <= 70)) return false;
-      if (fRange === 'overbought' && !(r !== null && r > 70))          return false;
-    }
-
-    // % Move filter
     const fPct = document.getElementById('f-pct').value;
     if (fPct) {
       const p = row['% Change'];
@@ -1325,197 +1197,32 @@ function buildTechTable(rows) {
   });
 }
 
-function buildTechStats(rows) {
-  document.getElementById('st-total').textContent      = rows.length;
-  document.getElementById('st-strong-buy').textContent = rows.filter(r => r['Consensus'] === 'Strong Buy').length;
-  document.getElementById('st-buy').textContent        = rows.filter(r => r['Consensus'] === 'Buy').length;
-  document.getElementById('st-uptrend').textContent    = rows.filter(r => r['Trend'] === 'Uptrend').length;
-  document.getElementById('st-vol').textContent        = rows.filter(r => r['Vol Spike'] === 'Yes').length;
-  const sellCount = rows.filter(r => r['Consensus'] === 'Sell' || r['Consensus'] === 'Strong Sell').length;
-  document.getElementById('st-sell').textContent       = sellCount;
+function applySignalsFilters() {
+  if (signalsTable) signalsTable.draw();
+  updateFilterCount('signals');
 }
 
-function applyTechFilters() {
-  if (techTable) techTable.draw();
-  updateFilterCount('tech');
-}
-
-function clearTechFilters() {
-  ['f-consensus','f-trend','f-volspike','f-macd','f-rsi','f-ut','f-rsi-range','f-pct'].forEach(id => {
+function clearSignalsFilters() {
+  ['f-consensus','f-trend','f-volspike','f-rec','f-pct'].forEach(id => {
     document.getElementById(id).value = '';
   });
-  state.tech.signalOnly = false;
-  document.getElementById('sig-only-tech').classList.remove('active');
-  if (techTable) techTable.draw();
-  updateFilterCount('tech');
-}
-
-// ── Fund table ─────────────────────────────────────────────────────────────
-function buildFundTable(rows) {
-  buildFundStats(rows);
-  document.getElementById('fund-placeholder').style.display = 'none';
-  document.getElementById('fund-table-wrap').style.display  = 'block';
-
-  if (fundTable) { fundTable.clear().rows.add(rows).draw(false); return; }
-
-  fundTable = $('#fund-table').DataTable({
-    data: rows,
-    scrollX: true,
-    fixedColumns: { start: 1 },
-    pageLength: 25,
-    order: [[10, 'desc']],
-    dom: 'Blfrtip',
-    buttons: [{
-      extend: 'csvHtml5',
-      text: '⬇ Export CSV',
-      title: 'nifty_fundamental_scan',
-      exportOptions: { columns: ':not(:last-child)' }
-    }],
-    columns: [
-      // 0: Symbol
-      { data: 'Symbol', render: (d, t) => {
-          if (t !== 'display') return d;
-          const sym = d.replace('.NS','');
-          return `<div class="stock-name">${sym}</div><div class="stock-sub">${d}</div>`;
-        }
-      },
-      // 1: Sector
-      { data: 'Sector', render: (d, t) => {
-          if (t !== 'display') return d || '---';
-          return `<span style="font-size:11px;color:var(--muted2)">${d || '—'}</span>`;
-        }
-      },
-      // 2: Price
-      { data: 'Price', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          return d !== null ? `₹${d.toLocaleString('en-IN')}` : '—';
-        }
-      },
-      // 3: P/E
-      { data: 'P/E', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          if (d === null || d === undefined) return '—';
-          const color = d < 15 ? 'var(--green)' : d < 30 ? 'var(--muted2)' : 'var(--red)';
-          return `<span style="color:${color};font-weight:600">${d}</span>`;
-        }
-      },
-      // 4: Sector Med P/E
-      { data: 'Sector Med P/E', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          return d !== null && d !== undefined ? `<span style="color:var(--muted2)">${d}</span>` : '—';
-        }
-      },
-      // 5: D/E
-      { data: 'D/E', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          if (d === null || d === undefined) return '—';
-          const color = d < 50 ? 'var(--green)' : d < 100 ? 'var(--orange)' : 'var(--red)';
-          return `<span style="color:${color}">${d}</span>`;
-        }
-      },
-      // 6: ROE
-      { data: 'ROE', render: (d, t) => {
-          if (t !== 'display') return d ?? 0;
-          if (d === null || d === undefined) return '—';
-          const color = d >= 15 ? 'var(--green)' : d >= 8 ? 'var(--orange)' : 'var(--red)';
-          return `<span style="color:${color}">${d}%</span>`;
-        }
-      },
-      // 7: RSI
-      { data: 'RSI', render: (d, t) => t !== 'display' ? (d ?? 0) : rsiColor(d) },
-      // 8: Fund Score
-      { data: 'Fund Score', render: (d, t) => t !== 'display' ? (d ?? 0) : scoreBar(d, 5) },
-      // 9: Tech Score
-      { data: 'Tech Score', render: (d, t) => t !== 'display' ? (d ?? 0) : scoreBar(d, 5) },
-      // 10: Final Score
-      { data: 'Final Score', render: (d, t) => t !== 'display' ? (d ?? 0) : scoreBar(d, 1) },
-      // 11: Rec
-      { data: 'Recommendation', render: (d, t) => {
-          if (t !== 'display') return d || '---';
-          if (d === 'Buy')  return `<span class="sig sig-buy">Buy</span>`;
-          if (d === 'Sell') return `<span class="sig sig-sell">Sell</span>`;
-          if (d === 'Hold') return `<span class="sig sig-hold">Hold</span>`;
-          return `<span class="sig sig-neutral">—</span>`;
-        }
-      },
-      // 12: Chart
-      { data: 'Chart', orderable: false, render: (d, t) => {
-          if (t !== 'display') return '';
-          return d ? `<a href="${d}" target="_blank" class="tv-link">↗ Chart</a>` : '—';
-        }
-      },
-    ],
-    stateSave: true,
-    stateLoadCallback: function() { return null; },
-    createdRow: function(row, data) {
-      const sym    = (data.Symbol || '').replace('.NS', '');
-      const price  = data.Price || 0;
-      const action = (data.Recommendation || '').toLowerCase() === 'sell' ? 'Sell' : 'Buy';
-      $('td:first-child', row).append(
-        `<button class="trade-btn" onclick="openAddTradeFromScanner('${sym}',${price},'${action}')">+ Trade</button>`
-      );
-    }
-  });
-
-  // Custom fund search filters
-  $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-    if (settings.nTable.id !== 'fund-table') return true;
-    const row = fundTable.row(dataIndex).data();
-    if (!row) return true;
-
-    const fRec = document.getElementById('f-rec').value;
-    if (fRec && row['Recommendation'] !== fRec) return false;
-
-    const minFund = parseFloat(document.getElementById('f-fund-score').value) || 0;
-    if (row['Fund Score'] !== null && row['Fund Score'] < minFund) return false;
-
-    const minFinal = parseFloat(document.getElementById('f-final-score').value) || 0;
-    if (row['Final Score'] !== null && row['Final Score'] < minFinal) return false;
-
-    return true;
-  });
-}
-
-function buildFundStats(rows) {
-  document.getElementById('fs-total').textContent    = rows.length;
-  document.getElementById('fs-buy').textContent      = rows.filter(r => r['Recommendation'] === 'Buy').length;
-  document.getElementById('fs-hold').textContent     = rows.filter(r => r['Recommendation'] === 'Hold').length;
-  document.getElementById('fs-sell').textContent     = rows.filter(r => r['Recommendation'] === 'Sell').length;
-  const fundScores  = rows.map(r => r['Fund Score']).filter(v => v !== null && v !== undefined);
-  const techScores  = rows.map(r => r['Tech Score']).filter(v => v !== null && v !== undefined);
-  document.getElementById('fs-fund-avg').textContent = fundScores.length
-    ? (fundScores.reduce((a,b)=>a+b,0) / fundScores.length).toFixed(1) : '—';
-  document.getElementById('fs-tech-avg').textContent = techScores.length
-    ? (techScores.reduce((a,b)=>a+b,0) / techScores.length).toFixed(1) : '—';
-}
-
-function applyFundFilters() {
-  if (fundTable) fundTable.draw();
-  updateFilterCount('fund');
-}
-
-function clearFundFilters() {
-  ['f-rec','f-fund-score','f-final-score'].forEach(id => {
-    document.getElementById(id).value = id === 'f-fund-score' || id === 'f-final-score' ? '0' : '';
-  });
-  if (fundTable) fundTable.draw();
-  updateFilterCount('fund');
+  state.signalOnly = false;
+  document.getElementById('sig-only-signals').classList.remove('active');
+  if (signalsTable) signalsTable.draw();
+  updateFilterCount('signals');
 }
 
 // ── Filter count badge ─────────────────────────────────────────────────────
 function updateFilterCount(name) {
   let count = 0;
-  if (name === 'tech') {
-    ['f-consensus','f-trend','f-volspike','f-macd','f-rsi','f-ut','f-rsi-range','f-pct'].forEach(id => {
+  if (name === 'signals') {
+    ['f-consensus','f-trend','f-volspike','f-rec','f-pct'].forEach(id => {
       if (document.getElementById(id).value) count++;
     });
-    if (state.tech.signalOnly) count++;
-  } else {
-    if (document.getElementById('f-rec').value) count++;
-    if (parseFloat(document.getElementById('f-fund-score').value) > 0) count++;
-    if (parseFloat(document.getElementById('f-final-score').value) > 0) count++;
+    if (state.signalOnly) count++;
   }
   const el = document.getElementById('fcount-' + name);
+  if (!el) return;
   el.textContent = count || '';
   el.style.display = count ? 'inline' : 'none';
 }
@@ -1530,11 +1237,11 @@ function toggleFilters(name) {
 
 function initFilters() {
   const mobile = window.innerWidth < 600;
-  ['tech','fund'].forEach(name => {
+  ['signals'].forEach(name => {
     const toggle = document.getElementById('ftoggle-' + name);
     const inner  = document.getElementById('finner-' + name);
-    toggle.style.display = mobile ? 'inline-flex' : 'none';
-    if (!mobile) inner.classList.remove('open');
+    if (toggle) toggle.style.display = mobile ? 'inline-flex' : 'none';
+    if (inner && !mobile) inner.classList.remove('open');
   });
 }
 
@@ -1796,8 +1503,7 @@ try {
 
 initFilters();
 window.addEventListener('resize', initFilters);
-loadData('tech');
-loadData('fund');
+loadData('signals');
 
 // ═══════════════════════════════════════════════════════════════════
 // PAPER TRADING

@@ -108,6 +108,10 @@ def _sma(series, w):
     return series.rolling(window=w, min_periods=1).mean()
 
 
+def _ema(series, span):
+    return series.ewm(span=span, adjust=False).mean()
+
+
 # ── UT Bot with dynamic multiplier ───────────────────────────────────────────
 
 def calculate_ut_bot(df, a=1.0, c=10):
@@ -156,27 +160,39 @@ def signal_rsi(rsi_series):
     if len(r) < 2:
         return '---'
     cur, prev = r.iloc[-1], r.iloc[-2]
-    if cur <= 35 and prev > 35:
+    if cur <= 40 and prev > 40:
         return 'Buy'
-    if cur >= 55 and prev < 55:
+    if cur >= 60 and prev < 60:
+        return 'Sell'
+    return '---'
+
+
+def signal_ema_cross(close):
+    """9-period EMA crossing 21-period EMA — short-term momentum signal."""
+    if len(close) < 22:
+        return '---'
+    ema9  = _ema(close, 9)
+    ema21 = _ema(close, 21)
+    if ema9.iloc[-1] > ema21.iloc[-1] and ema9.iloc[-2] <= ema21.iloc[-2]:
+        return 'Buy'
+    if ema9.iloc[-1] < ema21.iloc[-1] and ema9.iloc[-2] >= ema21.iloc[-2]:
         return 'Sell'
     return '---'
 
 
 # ── Consensus ─────────────────────────────────────────────────────────────────
 
-def _consensus(macd_sig, rsi_sig, ut_sig):
-    """Return (consensus_label, buy_count_or_sell_count)."""
-    buys  = sum(1 for s in [macd_sig, rsi_sig, ut_sig] if s == 'Buy')
-    sells = sum(1 for s in [macd_sig, rsi_sig, ut_sig] if s == 'Sell')
-    if buys == 3:
-        return 'Strong Buy', 3
-    if buys == 2:
-        return 'Buy', 2
-    if sells == 3:
-        return 'Strong Sell', 3
-    if sells == 2:
-        return 'Sell', 2
+def _consensus(macd_sig, rsi_sig, ut_sig, ema_sig='---'):
+    """Return (consensus_label, signal_count) using up to 4 signals."""
+    signals = [macd_sig, rsi_sig, ut_sig, ema_sig]
+    buys  = sum(1 for s in signals if s == 'Buy')
+    sells = sum(1 for s in signals if s == 'Sell')
+    if buys == 4:   return 'Strong Buy',  4
+    if buys == 3:   return 'Buy',          3
+    if sells == 4:  return 'Strong Sell',  4
+    if sells == 3:  return 'Sell',         3
+    if buys == 2:   return 'Neutral',      2
+    if sells == 2:  return 'Neutral',      2
     return 'Neutral', max(buys, sells)
 
 
@@ -299,6 +315,11 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             rsi_sig  = signal_rsi(rsi_series)
             ut_sig   = ('Buy'  if buy_sig.iloc[-1]  else
                         'Sell' if sell_sig.iloc[-1] else '---')
+            ema_sig  = signal_ema_cross(close)
+
+            # ── 50 SMA (from signal df) ──
+            sma50_s   = _sma(close, 50)
+            sma50_val = safe_float(sma50_s.iloc[-1], 2)
 
             # ── Price / % change ──
             if len(close) < 2:
@@ -307,16 +328,17 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             prev_price = safe_float(close.iloc[-2])
             if price is None or prev_price is None or prev_price == 0:
                 return None
-            pct_chg      = safe_float(((price - prev_price) / prev_price) * 100, 2)
-            rsi_val      = safe_float(rsi_series.dropna().iloc[-1], 1)  if not rsi_series.dropna().empty else None
+            pct_chg       = safe_float(((price - prev_price) / prev_price) * 100, 2)
+            rsi_val       = safe_float(rsi_series.dropna().iloc[-1], 1)  if not rsi_series.dropna().empty else None
             macd_hist_val = safe_float(hist.dropna().iloc[-1], 3)        if not hist.dropna().empty      else None
 
-            # ── Consensus ──
-            consensus, strength = _consensus(macd_sig, rsi_sig, ut_sig)
+            # ── Consensus (4 signals) ──
+            consensus, strength = _consensus(macd_sig, rsi_sig, ut_sig, ema_sig)
 
-            # Suppress Buy signals in downtrend
+            # Suppress Buy signals when price is below 200 SMA (downtrend)
             if trend == 'Downtrend' and consensus in ('Buy', 'Strong Buy'):
                 consensus = 'No Signal'
+                strength  = 0
 
             return {
                 'Stock':        stock,
@@ -332,8 +354,10 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
                 'MACD Signal':  macd_sig,
                 'RSI Signal':   rsi_sig,
                 'UT Bot':       ut_sig,
+                'EMA Cross':    ema_sig,
                 'Beta':         beta,
                 '200 SMA':      sma200_val,
+                '50 SMA':       sma50_val,
                 'Last Scanned': datetime.now().strftime("%d %b %Y, %H:%M"),
                 'Chart':        generate_tv_link(stock),
             }
@@ -399,6 +423,8 @@ def _fetch_fund_raw(sym, period, interval):
     pe     = safe_float(info.get('trailingPE') or info.get('forwardPE'))
     dte    = safe_float(info.get('debtToEquity'))
     roe    = safe_float(info.get('returnOnEquity') or info.get('returnOnAssets'))
+    pb     = safe_float(info.get('priceToBook'))
+    eg     = safe_float(info.get('earningsGrowth'))
     sector = info.get('sector') or 'Unknown'
 
     return {
@@ -409,6 +435,8 @@ def _fetch_fund_raw(sym, period, interval):
         'pe':     pe,
         'dte':    dte,
         'roe':    roe,
+        'pb':     pb,
+        'eg':     eg,
         'sector': sector,
     }
 
@@ -465,6 +493,8 @@ def run_fundamental_scan(stocks, period='1y', interval='1d', progress_cb=None):
             pe     = item['pe']
             dte    = item['dte']
             roe    = item['roe']
+            pb     = item.get('pb')
+            eg     = item.get('eg')
             sector = item['sector']
             sector_med_pe = sector_medians.get(sector)
 
@@ -501,7 +531,15 @@ def run_fundamental_scan(stocks, period='1y', interval='1d', progress_cb=None):
             if roe is not None:
                 fscore += 1 if roe >= 0.15 else (0.5 if roe > 0.08 else 0)
 
-            # Revenue growth
+            # P/B ratio — value indicator (lower = more undervalued)
+            if pb is not None and pb > 0:
+                fscore += 1 if pb < 1.5 else (0.5 if pb < 3.0 else 0)
+
+            # Earnings growth — profitability momentum
+            if eg is not None:
+                fscore += 1 if eg > 0.15 else (0.5 if eg > 0 else 0)
+
+            # Revenue growth — prefer year-over-year comparison
             try:
                 if isinstance(qfin, pd.DataFrame) and not qfin.empty:
                     rev_row = None
@@ -512,7 +550,10 @@ def run_fundamental_scan(stocks, period='1y', interval='1d', progress_cb=None):
                     if rev_row is None:
                         rev_row = qfin.iloc[0]
                     rv = rev_row.dropna().astype(float)
-                    if len(rv) >= 3:
+                    if len(rv) >= 5:
+                        growth = (rv.iloc[0] - rv.iloc[4]) / (abs(rv.iloc[4]) + 1e-6)
+                        fscore += 1 if growth > 0.10 else (0.5 if growth > 0 else 0)
+                    elif len(rv) >= 3:
                         growth = (rv.iloc[0] - rv.iloc[-1]) / (abs(rv.iloc[-1]) + 1e-6)
                         if growth > 0.03:
                             fscore += 1
@@ -523,7 +564,7 @@ def run_fundamental_scan(stocks, period='1y', interval='1d', progress_cb=None):
             final  = round(0.6 * (fscore / 5) + 0.4 * (tscore / 5), 3)
             rec    = 'Sell'
             if fscore >= 2.5:
-                rec = 'Buy' if final >= 0.7 else ('Hold' if final >= 0.45 else 'Sell')
+                rec = 'Buy' if final >= 0.65 else ('Hold' if final >= 0.45 else 'Sell')
 
             roe_display = safe_float(roe * 100, 1) if roe is not None else None
 
