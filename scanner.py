@@ -272,12 +272,26 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             if len(daily_close) < 5:
                 return None
 
+            sma50      = _sma(daily_close, 50)
             sma200     = _sma(daily_close, 200)
+            sma50_val  = safe_float(sma50.iloc[-1], 2)
             sma200_val = safe_float(sma200.iloc[-1], 2)
             price_d    = safe_float(daily_close.iloc[-1], 2)
-            trend      = ('Uptrend'
-                          if (price_d is not None and sma200_val is not None and price_d > sma200_val)
-                          else 'Downtrend')
+
+            # 50 SMA slope: rising if current > 10 bars ago (≈ 2 trading weeks)
+            sma50_prev   = safe_float(sma50.iloc[-10], 2) if len(sma50) >= 10 else sma50_val
+            sma50_rising = (sma50_val is not None and sma50_prev is not None
+                            and sma50_val > sma50_prev)
+
+            # Trend = SMA alignment + slope
+            if (price_d is not None and sma50_val is not None and sma200_val is not None
+                    and price_d > sma50_val and sma50_val > sma200_val and sma50_rising):
+                trend = 'Uptrend'
+            elif (price_d is not None and sma50_val is not None and sma200_val is not None
+                    and price_d < sma50_val and sma50_val < sma200_val):
+                trend = 'Downtrend'
+            else:
+                trend = 'Sideways'
 
             # ── Daily: volume spike ──
             vol_ratio = None
