@@ -293,6 +293,22 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             else:
                 trend = 'Sideways'
 
+            # 200 EMA cross — did price cross the 200-day EMA in last 10 candles?
+            ema200       = _ema(daily_close, 200)
+            ema200_cross = '---'
+            look = min(10, len(daily_close) - 1)
+            for i in range(1, look + 1):
+                pp = float(daily_close.iloc[-i - 1])
+                cp = float(daily_close.iloc[-i])
+                pe = float(ema200.iloc[-i - 1])
+                ce = float(ema200.iloc[-i])
+                if pp <= pe and cp > ce:
+                    ema200_cross = 'Bullish Cross'
+                    break
+                elif pp >= pe and cp < ce:
+                    ema200_cross = 'Bearish Cross'
+                    break
+
             # ── Daily: volume spike ──
             vol_ratio = None
             vol_spike = False
@@ -369,6 +385,7 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
                 'RSI Signal':   rsi_sig,
                 'UT Bot':       ut_sig,
                 'EMA Cross':    ema_sig,
+                '200 EMA Cross': ema200_cross,
                 'Beta':         beta,
                 '200 SMA':      sma200_val,
                 '50 SMA':       sma50_val,

@@ -164,8 +164,9 @@ def load_tech_csv():
             'MACD Signal':  _str_or(r, 'MACD Signal', '---'),
             'RSI Signal':   _str_or(r, 'RSI Signal',  '---'),
             'UT Bot':       _str_or(r, 'UT Bot',       '---'),
-            'EMA Cross':    _str_or(r, 'EMA Cross',    '---'),
-            'Beta':         _float_or_none(r.get('Beta', '')),
+            'EMA Cross':     _str_or(r, 'EMA Cross',     '---'),
+            '200 EMA Cross': _str_or(r, '200 EMA Cross', '---'),
+            'Beta':          _float_or_none(r.get('Beta', '')),
             '200 SMA':      _float_or_none(r.get('200 SMA', '')),
             '50 SMA':       _float_or_none(r.get('50 SMA', '')),
             'Last Scanned': _str_or(r, 'Last Scanned', ''),
@@ -263,6 +264,7 @@ def data_signals():
             'MACD Signal':    tr.get('MACD Signal'),
             'UT Bot':         tr.get('UT Bot'),
             'EMA Cross':      tr.get('EMA Cross'),
+            '200 EMA Cross':  tr.get('200 EMA Cross'),
             'Vol Ratio':      tr.get('Vol Ratio'),
             'Vol Spike':      tr.get('Vol Spike'),
             'Beta':           tr.get('Beta'),
@@ -295,6 +297,60 @@ def data_signals():
         "tech_params": scan_params["tech"],
         "fund_params": scan_params["fund"],
     })
+
+
+@app.route("/api/download/combined")
+def download_combined():
+    import csv as csv_mod
+    from io import StringIO
+    tech_rows = scan_results["tech"] if scan_results["tech"] is not None else load_tech_csv()
+    fund_rows = scan_results["fund"] if scan_results["fund"] is not None else load_fund_csv()
+    fund_map = {}
+    for row in (fund_rows or []):
+        sym = row.get('Symbol', '')
+        if sym:
+            fund_map[sym] = row
+            fund_map[sym.replace('.NS', '')] = row
+    merged = []
+    for tr in (tech_rows or []):
+        stock = tr.get('Stock', '')
+        fr = fund_map.get(stock) or fund_map.get(stock.replace('.NS', '')) or {}
+        merged.append({
+            'Stock':          stock,
+            'Price':          tr.get('Price', ''),
+            '% Change':       tr.get('% Change', ''),
+            'Consensus':      tr.get('Consensus', ''),
+            'Strength':       tr.get('Strength', ''),
+            'Trend':          tr.get('Trend', ''),
+            'RSI':            tr.get('RSI', ''),
+            'MACD Signal':    tr.get('MACD Signal', ''),
+            'UT Bot':         tr.get('UT Bot', ''),
+            'EMA Cross':      tr.get('EMA Cross', ''),
+            '200 EMA Cross':  tr.get('200 EMA Cross', ''),
+            'Vol Ratio':      tr.get('Vol Ratio', ''),
+            'Vol Spike':      tr.get('Vol Spike', ''),
+            '50 SMA':         tr.get('50 SMA', ''),
+            '200 SMA':        tr.get('200 SMA', ''),
+            'Beta':           tr.get('Beta', ''),
+            'Fund Score':     fr.get('Fund Score', ''),
+            'Final Score':    fr.get('Final Score', ''),
+            'Recommendation': fr.get('Recommendation', ''),
+            'Sector':         fr.get('Sector', ''),
+            'P/E':            fr.get('P/E', ''),
+            'D/E':            fr.get('D/E', ''),
+            'ROE':            fr.get('ROE', ''),
+        })
+    if not merged:
+        return jsonify({"error": "No data available. Run a scan first."}), 404
+    si = StringIO()
+    writer = csv_mod.DictWriter(si, fieldnames=list(merged[0].keys()))
+    writer.writeheader()
+    writer.writerows(merged)
+    from flask import make_response
+    out = make_response(si.getvalue())
+    out.headers["Content-Disposition"] = "attachment; filename=nifty_combined_scan.csv"
+    out.headers["Content-type"] = "text/csv"
+    return out
 
 
 @app.route("/api/run/<scanner>", methods=["POST"])

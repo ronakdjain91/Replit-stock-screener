@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css"/>
   <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.3.0/css/fixedColumns.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css"/>
 
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -15,6 +16,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
   <script src="https://cdn.datatables.net/fixedcolumns/4.3.0/js/dataTables.fixedColumns.min.js"></script>
+  <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
 
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -177,6 +179,19 @@
     .trend-up{color:#38bdf8;font-weight:600;font-size:12px}
     .trend-dn{color:#f87171;font-weight:600;font-size:12px}
     .trend-sw{color:#f59e0b;font-weight:600;font-size:12px}
+
+    /* ── 200 EMA CROSS BADGE ── */
+    .ema-bull{background:rgba(16,185,129,.18);color:#10b981;border:1px solid rgba(16,185,129,.35)}
+    .ema-bear{background:rgba(239,68,68,.18);color:#f87171;border:1px solid rgba(239,68,68,.35)}
+
+    /* ── STOCK LINKS ── */
+    .stock-link{color:inherit;text-decoration:none;font-weight:700}
+    .stock-link:hover{color:var(--accent2);text-decoration:underline}
+    .concall-link{color:var(--muted);font-size:11px;text-decoration:none;margin-left:4px}
+    .concall-link:hover{color:var(--accent2)}
+
+    /* ── STICKY TABLE HEADER ── */
+    div.dataTables_scrollHead{position:sticky;top:0;z-index:12;background:var(--surface)}
 
     /* ── VOL BAR ── */
     .vol-cell{display:flex;align-items:center;gap:5px}
@@ -403,8 +418,9 @@
           <span class="status-badge s-idle" id="badge-fund">Fund</span>
           <button class="btn btn-ghost btn-sm" id="run-fund" onclick="runScanner('fund')">▶ Fund</button>
           <button class="btn btn-ghost btn-sm sig-only-btn" id="sig-only-signals" onclick="toggleSignalOnly()" title="Show only stocks with Buy/Sell signals">Signal Only</button>
-          <a href="/api/download/tech" class="btn btn-success btn-sm">↓ Tech</a>
-          <a href="/api/download/fund" class="btn btn-success btn-sm">↓ Fund</a>
+          <a href="/api/download/combined" class="btn btn-success btn-sm" title="Download merged Tech + Fund data">↓ Combined CSV</a>
+          <a href="/api/download/tech" class="btn btn-ghost btn-sm" title="Download technical scan CSV">↓ Tech</a>
+          <a href="/api/download/fund" class="btn btn-ghost btn-sm" title="Download fundamental scan CSV">↓ Fund</a>
         </div>
       </div>
 
@@ -545,6 +561,7 @@
               <th>MACD</th>
               <th>UT Bot</th>
               <th>EMA X</th>
+              <th>200 EMA X</th>
               <th>Vol</th>
               <th>Fund Score</th>
               <th>Rec</th>
@@ -1020,15 +1037,19 @@ function pctHtml(v) {
   return `<span class="${cls}">${sign}${v}%</span>`;
 }
 
-function volBar(ratio) {
+function volBar(ratio, pctChange) {
   if (ratio === null || ratio === undefined) return '<span style="color:var(--muted)">—</span>';
   const pct   = Math.min((ratio / 3.0) * 100, 100);
-  const color = ratio >= 1.5 ? '#10b981' : '#374151';
-  const lbl   = ratio >= 1.5
-    ? `<span style="color:#10b981;font-weight:600">${ratio.toFixed(1)}×</span>`
+  const isUp  = pctChange !== null && pctChange !== undefined && pctChange >= 0;
+  const spike = ratio >= 1.5;
+  const barColor = isUp
+    ? (spike ? '#10b981' : '#166534')
+    : (spike ? '#ef4444' : '#7f1d1d');
+  const lbl = spike
+    ? `<span style="color:${isUp ? '#10b981' : '#ef4444'};font-weight:600">${ratio.toFixed(1)}×</span>`
     : `<span style="color:var(--muted)">${ratio.toFixed(1)}×</span>`;
   return `<div class="vol-cell">
-    <div class="vol-track"><div class="vol-fill" style="width:${pct}%;background:${color}"></div></div>
+    <div class="vol-track"><div class="vol-fill" style="width:${pct}%;background:${barColor}"></div></div>
     ${lbl}
   </div>`;
 }
@@ -1064,6 +1085,7 @@ function buildSignalsTable(rows) {
     data: rows,
     scrollX: true,
     fixedColumns: { start: 1 },
+    fixedHeader: true,
     pageLength: 25,
     order: [[3, 'asc']],
     dom: 'Blfrtip',
@@ -1076,9 +1098,17 @@ function buildSignalsTable(rows) {
     columns: [
       // 0: Stock
       { data: 'Stock', render: (d, t) => {
-          if (t !== 'display') return d || '';
+          if (t !== 'display') return (d || '').replace('.NS','');
           const sym = (d || '').replace('.NS','');
-          return `<div class="stock-name">${sym}</div><div class="stock-sub">${d}</div>`;
+          const kiteUrl    = `https://kite.zerodha.com/chart/web/nse/NSE:${sym}/${sym}`;
+          const concallUrl = `https://www.screener.in/company/${sym}/`;
+          return `<div class="stock-name">
+            <a href="${kiteUrl}" target="_blank" rel="noopener" class="stock-link">${sym}</a>
+          </div>
+          <div class="stock-sub">
+            ${d}
+            <a href="${concallUrl}" target="_blank" rel="noopener" class="concall-link" title="Concalls on Screener.in">📋</a>
+          </div>`;
         }
       },
       // 1: Price
@@ -1116,12 +1146,20 @@ function buildSignalsTable(rows) {
       { data: 'MACD Signal', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
       // 8: UT Bot
       { data: 'UT Bot', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
-      // 9: EMA Cross
+      // 9: EMA Cross (9/21)
       { data: 'EMA Cross', render: (d, t) => t !== 'display' ? (d || '---') : sigBadge(d) },
-      // 10: Vol
-      { data: 'Vol Ratio', render: (d, t) => {
+      // 10: 200 EMA Cross
+      { data: '200 EMA Cross', render: (d, t) => {
+          if (t !== 'display') return d || '---';
+          if (d === 'Bullish Cross') return `<span class="badge ema-bull" style="padding:2px 6px;border-radius:4px;font-size:11px">↑ 200 EMA</span>`;
+          if (d === 'Bearish Cross') return `<span class="badge ema-bear" style="padding:2px 6px;border-radius:4px;font-size:11px">↓ 200 EMA</span>`;
+          return '<span style="color:var(--muted)">—</span>';
+        }
+      },
+      // 11: Vol
+      { data: 'Vol Ratio', render: (d, t, row) => {
           if (t !== 'display') return d ?? 0;
-          return volBar(d);
+          return volBar(d, row['% Change']);
         }
       },
       // 11: Fund Score
