@@ -233,9 +233,7 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
     # Fetch Nifty benchmark once for beta
     nifty_close = None
     try:
-        nifty_df = yf.download("^NSEI", period="1y", interval="1d",
-                               progress=False, auto_adjust=True)
-        nifty_df = flatten_columns(nifty_df)
+        nifty_df = yf.Ticker("^NSEI").history(period="1y", interval="1d")
         if not nifty_df.empty and 'Close' in nifty_df.columns:
             nifty_close = nifty_df['Close'].ffill().dropna()
     except Exception as e:
@@ -248,18 +246,15 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
 
     def process_stock(stock):
         try:
+            ticker = yf.Ticker(stock)
             # Always fetch 1y daily for 200-SMA, volume, beta
-            daily = yf.download(stock, period="1y", interval="1d",
-                                progress=False, auto_adjust=True)
-            daily = flatten_columns(daily)
+            daily = ticker.history(period="1y", interval="1d")
 
             # Fetch selected period/interval for signal indicators
             if interval == '1d' and period == '1y':
                 sig_df = daily
             else:
-                sig_df = yf.download(stock, period=period, interval=interval,
-                                     progress=False, auto_adjust=True)
-                sig_df = flatten_columns(sig_df)
+                sig_df = ticker.history(period=period, interval=interval)
 
             if daily is None or daily.empty or 'Close' not in daily.columns:
                 return None
