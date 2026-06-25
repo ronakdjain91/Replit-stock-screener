@@ -112,6 +112,171 @@ def _ema(series, span):
     return series.ewm(span=span, adjust=False).mean()
 
 
+def _adx(high, low, close, period=14):
+    """Average Directional Index — measures trend strength (>25 = strong trend)."""
+    try:
+        tr_list, pdm_list, ndm_list = [], [], []
+        for i in range(1, len(close)):
+            h  = float(high.iloc[i]);  l  = float(low.iloc[i])
+            ph = float(high.iloc[i-1]); pl = float(low.iloc[i-1])
+            pc = float(close.iloc[i-1])
+            tr   = max(h - l, abs(h - pc), abs(l - pc))
+            pdm  = max(h - ph, 0) if (h - ph) > (pl - l) else 0
+            ndm  = max(pl - l, 0) if (pl - l) > (h - ph) else 0
+            tr_list.append(tr); pdm_list.append(pdm); ndm_list.append(ndm)
+        tr_s  = pd.Series(tr_list,  dtype=float)
+        pdm_s = pd.Series(pdm_list, dtype=float)
+        ndm_s = pd.Series(ndm_list, dtype=float)
+        atr   = tr_s.ewm(span=period, adjust=False).mean()
+        pdi   = 100 * pdm_s.ewm(span=period, adjust=False).mean() / atr.replace(0, np.nan)
+        ndi   = 100 * ndm_s.ewm(span=period, adjust=False).mean() / atr.replace(0, np.nan)
+        dx    = 100 * (pdi - ndi).abs() / (pdi + ndi).replace(0, np.nan)
+        adx   = dx.ewm(span=period, adjust=False).mean()
+        return safe_float(adx.dropna().iloc[-1], 1) if not adx.dropna().empty else None
+    except Exception:
+        return None
+
+
+def _analyze_trend(daily_close, daily_high=None, daily_low=None, daily_vol=None):
+    """
+    Multi-factor trend analysis.
+    Factors: MA alignment, HH+HL structure, RSI, volume, breakout, MACD, ADX.
+    Returns: (classification, score_0_to_100, reasons_list, warnings_list)
+    """
+    reasons  = []
+    warnings = []
+    score    = 0
+    n        = len(daily_close)
+
+    if n < 30:
+        return 'No Uptrend', 0, reasons, warnings
+
+    price = float(daily_close.iloc[-1])
+
+    # ── 1. Moving Average Alignment (max 30 pts) ──────────────────────────────
+    sma20  = float(_sma(daily_close, 20).iloc[-1])
+    sma50  = float(_sma(daily_close, 50).iloc[-1])
+    sma200 = float(_sma(daily_close, min(200, n)).iloc[-1]) if n >= 50 else None
+
+    ma_pts = 0
+    ma_ok  = []
+    if price > sma20:               ma_pts += 10; ma_ok.append("Price>20DMA")
+    if sma20  > sma50:              ma_pts += 10; ma_ok.append("20>50DMA")
+    if sma200 and sma50 > sma200:   ma_pts += 10; ma_ok.append("50>200DMA")
+    score += ma_pts
+
+    if ma_pts == 30:
+        reasons.append(f"Full MA alignment ({', '.join(ma_ok)})")
+    elif ma_pts >= 20:
+        reasons.append(f"Partial MA alignment ({', '.join(ma_ok)})")
+    elif ma_pts >= 10:
+        reasons.append(f"Weak MA alignment ({ma_ok[0]})")
+
+    if sma200 and price < sma200:
+        warnings.append("Price below 200 DMA — long-term bearish structure")
+
+    # ── 2. HH + HL Price Structure (max 20 pts) ────────────────────────────────
+    chunk_size = 10
+    n_chunks   = min(6, n // chunk_size)
+    chunks     = []
+    for i in range(n_chunks - 1, -1, -1):
+        end   = n - i * chunk_size
+        start = end - chunk_size
+        if start >= 0:
+            ch = daily_close.iloc[start:end]
+            chunks.append((float(ch.max()), float(ch.min())))
+
+    hh_hl_streak = 0
+    for i in range(1, len(chunks)):
+        if chunks[i][0] > chunks[i-1][0] and chunks[i][1] > chunks[i-1][1]:
+            hh_hl_streak += 1
+        else:
+            hh_hl_streak = 0
+
+    if hh_hl_streak >= 3:
+        score += 20; reasons.append(f"Strong HH+HL structure ({hh_hl_streak} consecutive periods)")
+    elif hh_hl_streak >= 2:
+        score += 12; reasons.append(f"HH+HL structure developing ({hh_hl_streak} periods)")
+    elif hh_hl_streak >= 1:
+        score += 5;  reasons.append("Early HH+HL pattern (1 period)")
+    else:
+        warnings.append("No consistent HH+HL pattern")
+
+    # ── 3. RSI Trend Strength (max 15 pts) ────────────────────────────────────
+    rsi_d = _rsi(daily_close)
+    rsi_v = float(rsi_d.iloc[-1])
+
+    if 55 <= rsi_v <= 70:
+        score += 15; reasons.append(f"RSI in healthy uptrend zone ({rsi_v:.0f})")
+    elif 50 <= rsi_v < 55:
+        score += 8;  reasons.append(f"RSI above midpoint ({rsi_v:.0f})")
+    elif rsi_v > 75:
+        score += 5
+        warnings.append(f"RSI overbought ({rsi_v:.0f}) — reversal risk, avoid new entries")
+    elif rsi_v < 45:
+        warnings.append(f"RSI weak ({rsi_v:.0f}) — uptrend momentum lacking")
+
+    # ── 4. Volume Confirmation (max 15 pts) ────────────────────────────────────
+    if daily_vol is not None and len(daily_vol) >= 20:
+        vol_clean  = daily_vol.ffill().dropna()
+        avg_vol    = float(vol_clean.iloc[-20:].mean())
+        recent_vol = float(vol_clean.iloc[-1])
+        pct_5d     = float(daily_close.pct_change(5).iloc[-1]) if n >= 6 else 0
+        vol_ratio  = recent_vol / avg_vol if avg_vol > 0 else 1.0
+
+        if pct_5d > 0 and vol_ratio >= 1.2:
+            score += 15; reasons.append(f"Volume confirming price rise ({vol_ratio:.1f}× avg)")
+        elif pct_5d > 0 and vol_ratio >= 0.8:
+            score += 7;  reasons.append("Volume neutral with rising price")
+        elif pct_5d > 0 and vol_ratio < 0.7:
+            warnings.append("Rising price on declining volume — weak conviction")
+        elif pct_5d < 0 and vol_ratio >= 1.2:
+            warnings.append("High volume on price decline — distribution signal")
+
+    # ── 5. Breakout from Resistance (max 10 pts) ──────────────────────────────
+    high_52w = float(daily_close.iloc[-min(252, n):].max())
+    high_20d = float(daily_close.iloc[-min(20, n):].max())
+
+    if price >= high_52w * 0.99:
+        score += 10; reasons.append("At/near 52-week high (breakout zone)")
+    elif price >= high_20d * 0.995:
+        score += 5;  reasons.append("Breaking 20-day resistance")
+
+    # ── 6. MACD Momentum (max 10 pts) ─────────────────────────────────────────
+    _, _, macd_h = _macd(daily_close)
+    h_now  = float(macd_h.iloc[-1])
+    h_prev = float(macd_h.iloc[-2]) if n >= 2 else h_now
+
+    if h_now > 0 and h_now > h_prev:
+        score += 10; reasons.append("MACD bullish and strengthening")
+    elif h_now > 0:
+        score += 5;  reasons.append("MACD above signal line (bullish)")
+    elif h_now < 0 and h_now < h_prev:
+        warnings.append("MACD bearish and weakening")
+    elif h_now < 0:
+        warnings.append("MACD below signal line (bearish)")
+
+    # ── 7. ADX Trend Strength (bonus 5 pts) ────────────────────────────────────
+    if daily_high is not None and daily_low is not None and len(daily_high) >= 28:
+        adx_v = _adx(daily_high, daily_low, daily_close)
+        if adx_v is not None:
+            if adx_v >= 25:
+                score += 5; reasons.append(f"ADX {adx_v:.0f} — strong trend confirmed")
+            elif adx_v < 20:
+                warnings.append(f"ADX {adx_v:.0f} — weak/no directional trend")
+
+    score = min(int(round(score)), 100)
+
+    if score >= 65:
+        classification = 'Strong Uptrend'
+    elif score >= 35:
+        classification = 'Moderate Uptrend'
+    else:
+        classification = 'No Uptrend'
+
+    return classification, score, reasons, warnings
+
+
 # ── UT Bot with dynamic multiplier ───────────────────────────────────────────
 
 def calculate_ut_bot(df, a=1.0, c=10):
@@ -267,29 +432,24 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             if len(daily_close) < 5:
                 return None
 
-            sma50      = _sma(daily_close, 50)
-            sma200     = _sma(daily_close, 200)
-            sma50_val  = safe_float(sma50.iloc[-1], 2)
-            sma200_val = safe_float(sma200.iloc[-1], 2)
-            price_d    = safe_float(daily_close.iloc[-1], 2)
+            # ── Reference SMAs (kept for display) ──
+            sma50_val  = safe_float(_sma(daily_close, 50).iloc[-1], 2)
+            sma200_val = safe_float(_sma(daily_close, min(200, len(daily_close))).iloc[-1], 2)
 
-            # 50 SMA slope: rising if current > 10 bars ago (≈ 2 trading weeks)
-            sma50_prev   = safe_float(sma50.iloc[-10], 2) if len(sma50) >= 10 else sma50_val
-            sma50_rising = (sma50_val is not None and sma50_prev is not None
-                            and sma50_val > sma50_prev)
+            # ── High / Low / Volume series for trend analysis ──
+            daily_high_s = daily['High'].ffill()   if 'High'   in daily.columns else None
+            daily_low_s  = daily['Low'].ffill()    if 'Low'    in daily.columns else None
+            daily_vol_s  = daily['Volume'].ffill() if 'Volume' in daily.columns else None
 
-            # Trend = SMA alignment + slope
-            if (price_d is not None and sma50_val is not None and sma200_val is not None
-                    and price_d > sma50_val and sma50_val > sma200_val and sma50_rising):
-                trend = 'Uptrend'
-            elif (price_d is not None and sma50_val is not None and sma200_val is not None
-                    and price_d < sma50_val and sma50_val < sma200_val):
-                trend = 'Downtrend'
-            else:
-                trend = 'Sideways'
+            # ── Multi-factor trend analysis ──
+            trend, trend_score, trend_reasons, trend_warnings = _analyze_trend(
+                daily_close, daily_high_s, daily_low_s, daily_vol_s
+            )
+            trend_reasons_str  = ' | '.join(trend_reasons)
+            trend_warnings_str = ' | '.join(trend_warnings)
 
-            # 200 EMA cross — did price cross the 200-day EMA in last 10 candles?
-            ema200       = _ema(daily_close, 200)
+            # ── 200 EMA cross — did price cross 200-day EMA in last 10 candles? ──
+            ema200       = _ema(daily_close, min(200, len(daily_close)))
             ema200_cross = '---'
             look = min(10, len(daily_close) - 1)
             for i in range(1, look + 1):
@@ -360,16 +520,19 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             # ── Consensus (4 signals) ──
             consensus, strength = _consensus(macd_sig, rsi_sig, ut_sig, ema_sig)
 
-            # Suppress Buy signals when price is below 200 SMA (downtrend)
-            if trend == 'Downtrend' and consensus in ('Buy', 'Strong Buy'):
-                consensus = 'No Signal'
+            # Suppress Buy signals in low-confidence No Uptrend stocks
+            if trend == 'No Uptrend' and trend_score < 20 and consensus in ('Buy', 'Strong Buy'):
+                consensus = 'Neutral'
                 strength  = 0
 
             return {
-                'Stock':        stock,
-                'Consensus':    consensus,
-                'Strength':     strength,
-                'Trend':        trend,
+                'Stock':           stock,
+                'Consensus':       consensus,
+                'Strength':        strength,
+                'Trend':           trend,
+                'Trend Score':     trend_score,
+                'Trend Reasons':   trend_reasons_str,
+                'Trend Warnings':  trend_warnings_str,
                 'Vol Spike':    'Yes' if vol_spike else 'No',
                 'Vol Ratio':    vol_ratio,
                 'Price':        price,
