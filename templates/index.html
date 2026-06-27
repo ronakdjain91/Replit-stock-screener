@@ -193,8 +193,10 @@
     .concall-link{color:var(--muted);font-size:11px;text-decoration:none;margin-left:4px}
     .concall-link:hover{color:var(--accent2)}
 
-    /* ── STICKY TABLE HEADER ── */
-    div.dataTables_scrollHead{position:sticky;top:0;z-index:12;background:var(--surface)}
+    /* ── FROZEN TABLE HEADER (scrollY layout) ── */
+    div.dataTables_scrollHead{background:var(--surface)!important;border-bottom:1px solid var(--border)}
+    div.dataTables_scrollBody{overflow-y:auto!important}
+    div.dataTables_scroll{display:flex;flex-direction:column}
 
     /* ── VOL BAR ── */
     .vol-cell{display:flex;align-items:center;gap:5px}
@@ -1087,9 +1089,10 @@ function buildSignalsTable(rows) {
   signalsTable = $('#signals-table').DataTable({
     data: rows,
     scrollX: true,
+    scrollY: "calc(100vh - 430px)",
+    scrollCollapse: true,
     fixedColumns: { start: 1 },
-    fixedHeader: true,
-    pageLength: 25,
+    pageLength: 100,
     order: [[3, 'asc']],
     dom: 'Blfrtip',
     buttons: [{
