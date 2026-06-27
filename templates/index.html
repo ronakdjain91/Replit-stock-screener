@@ -15,8 +15,8 @@
   <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.colVis.min.js"></script>
   <script src="https://cdn.datatables.net/fixedcolumns/4.3.0/js/dataTables.fixedColumns.min.js"></script>
-  <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
 
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -254,6 +254,10 @@
     .dataTables_wrapper .dataTables_paginate .paginate_button:hover{background:#1e3a5f!important;color:var(--accent2)!important;border-color:var(--accent)!important}
     .dataTables_wrapper .dataTables_paginate .paginate_button.current{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
     .dt-buttons{padding:10px 14px}
+    div.dt-button-collection{background:var(--surface2)!important;border:1px solid var(--border)!important;border-radius:8px!important;padding:6px!important;box-shadow:0 8px 24px rgba(0,0,0,0.6)!important}
+    div.dt-button-collection .dt-button{background:transparent!important;border:none!important;color:var(--text)!important;text-align:left!important;padding:5px 12px!important;border-radius:4px!important;font-size:12px!important;width:100%}
+    div.dt-button-collection .dt-button.active{background:var(--accent)!important;color:#fff!important}
+    div.dt-button-collection .dt-button:hover{background:var(--surface3)!important;color:var(--accent2)!important}
     .dt-button{
       background:var(--surface2)!important;color:var(--muted2)!important;
       border:1px solid var(--border)!important;border-radius:7px!important;
@@ -402,15 +406,6 @@
   <!-- ═══ SIGNALS TAB (Buy/Sell Calls) ═══ -->
   <div class="panel active" id="panel-signals">
 
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-label">Total</div><div class="stat-value sv-total" id="ss-total">—</div><div class="stat-sub">stocks loaded</div></div>
-      <div class="stat-card"><div class="stat-label">Strong Buy</div><div class="stat-value sv-strong" id="ss-strong-buy">—</div><div class="stat-sub">4/4 signals</div></div>
-      <div class="stat-card"><div class="stat-label">Buy</div><div class="stat-value sv-buy" id="ss-buy">—</div><div class="stat-sub">3/4 signals</div></div>
-      <div class="stat-card"><div class="stat-label">Sell</div><div class="stat-value sv-sell" id="ss-sell">—</div><div class="stat-sub">sell signals</div></div>
-      <div class="stat-card"><div class="stat-label">Vol Spike</div><div class="stat-value sv-hold" id="ss-vol">—</div><div class="stat-sub">&gt;1.5× avg volume</div></div>
-      <div class="stat-card"><div class="stat-label">Fund Coverage</div><div class="stat-value sv-up" id="ss-fund">—</div><div class="stat-sub">Nifty 50 scored</div></div>
-    </div>
-
     <div class="toolbar">
       <div class="toolbar-top">
         <div>
@@ -423,9 +418,7 @@
           <span class="status-badge s-idle" id="badge-fund">Fund</span>
           <button class="btn btn-ghost btn-sm" id="run-fund" onclick="runScanner('fund')">▶ Fund</button>
           <button class="btn btn-ghost btn-sm sig-only-btn" id="sig-only-signals" onclick="toggleSignalOnly()" title="Show only stocks with Buy/Sell signals">Signal Only</button>
-          <a href="/api/download/combined" class="btn btn-success btn-sm" title="Download merged Tech + Fund data">↓ Combined CSV</a>
-          <a href="/api/download/tech" class="btn btn-ghost btn-sm" title="Download technical scan CSV">↓ Tech</a>
-          <a href="/api/download/fund" class="btn btn-ghost btn-sm" title="Download fundamental scan CSV">↓ Fund</a>
+          <a href="/api/download/combined" class="btn btn-success btn-sm" title="Download merged Tech + Fundamental data as CSV">↓ Download CSV</a>
         </div>
       </div>
 
@@ -504,7 +497,6 @@
             <option value="Neutral">Neutral</option>
             <option value="Sell">Sell</option>
             <option value="Strong Sell">Strong Sell</option>
-            <option value="No Signal">No Signal</option>
           </select>
         </div>
         <div class="filter-group">
@@ -560,14 +552,18 @@
               <th>Price</th>
               <th>% Chg</th>
               <th>Consensus</th>
-              <th>Strength</th>
               <th>Trend</th>
+              <th>Score</th>
               <th>RSI</th>
               <th>MACD</th>
               <th>UT Bot</th>
               <th>EMA X</th>
               <th>200 EMA X</th>
               <th>Vol</th>
+              <th>P/E</th>
+              <th>D/E</th>
+              <th>ROE%</th>
+              <th>Sector</th>
               <th>Fund Score</th>
               <th>Rec</th>
               <th>Final Score</th>
@@ -1070,17 +1066,7 @@ function scoreBar(v, max) {
 }
 
 // ── Signals table ──────────────────────────────────────────────────────────
-function buildSignalsStats(rows) {
-  document.getElementById('ss-total').textContent      = rows.length;
-  document.getElementById('ss-strong-buy').textContent = rows.filter(r => r['Consensus'] === 'Strong Buy').length;
-  document.getElementById('ss-buy').textContent        = rows.filter(r => r['Consensus'] === 'Buy').length;
-  document.getElementById('ss-sell').textContent       = rows.filter(r => r['Consensus'] === 'Sell' || r['Consensus'] === 'Strong Sell').length;
-  document.getElementById('ss-vol').textContent        = rows.filter(r => r['Vol Spike'] === 'Yes').length;
-  document.getElementById('ss-fund').textContent       = rows.filter(r => r['Recommendation'] && r['Recommendation'] !== '---').length;
-}
-
 function buildSignalsTable(rows) {
-  buildSignalsStats(rows);
   document.getElementById('signals-placeholder').style.display = 'none';
   document.getElementById('signals-table-wrap').style.display  = 'block';
 
@@ -1095,12 +1081,20 @@ function buildSignalsTable(rows) {
     pageLength: 100,
     order: [[3, 'asc']],
     dom: 'Blfrtip',
-    buttons: [{
-      extend: 'csvHtml5',
-      text: '⬇ Export CSV',
-      title: 'nifty_signals',
-      exportOptions: { columns: ':not(:last-child)' }
-    }],
+    buttons: [
+      {
+        extend: 'csvHtml5',
+        text: '⬇ Export CSV',
+        title: 'nifty_signals',
+        exportOptions: { columns: ':not(:last-child)' }
+      },
+      {
+        extend: 'colvis',
+        text: '⚙ Columns',
+        columns: ':not(:first-child)',
+        collectionLayout: 'fixed two-column'
+      }
+    ],
     columns: [
       // 0: Stock
       { data: 'Stock', render: (d, t) => {
@@ -1131,29 +1125,29 @@ function buildSignalsTable(rows) {
           return consensusBadge(d);
         }
       },
-      // 4: Strength
-      { data: 'Strength', render: (d, t, row) => {
-          if (t !== 'display') return d ?? 0;
-          return strengthPips(d ?? 0, row.Consensus);
-        }
-      },
-      // 5: Trend
+      // 4: Trend (label + reasons/warnings only, score in next col)
       { data: 'Trend', render: (d, t, row) => {
           if (t !== 'display') return d || '---';
-          const score    = row['Trend Score'];
           const reasons  = (row['Trend Reasons']  || '').split(' | ').filter(Boolean);
           const warnings = (row['Trend Warnings'] || '').split(' | ').filter(Boolean);
           let cls, icon;
-          if (d === 'Strong Uptrend')   { cls = 'trend-strong'; icon = '↑↑'; }
+          if (d === 'Strong Uptrend')        { cls = 'trend-strong'; icon = '↑↑'; }
           else if (d === 'Moderate Uptrend') { cls = 'trend-mod';    icon = '↑';  }
-          else                           { cls = 'trend-none';   icon = '—';  }
-          const scoreHtml = (score !== null && score !== undefined)
-            ? `<span class="trend-score">${score}</span>` : '';
+          else                               { cls = 'trend-none';   icon = '—';  }
           const reasonsHtml = reasons.length
             ? `<div class="trend-reasons">• ${reasons.join('<br>• ')}</div>` : '';
           const warnHtml = warnings.length
             ? `<div class="trend-warn">⚠ ${warnings.join('<br>⚠ ')}</div>` : '';
-          return `<span class="${cls}">${icon} ${d || '—'}${scoreHtml}</span>${reasonsHtml}${warnHtml}`;
+          return `<span class="${cls}">${icon} ${d || '—'}</span>${reasonsHtml}${warnHtml}`;
+        }
+      },
+      // 5: Trend Score
+      { data: 'Trend Score', render: (d, t) => {
+          if (t !== 'display') return d ?? -1;
+          if (d === null || d === undefined) return '<span style="color:var(--muted)">—</span>';
+          const pct = Math.round(d);
+          const color = pct >= 65 ? '#10b981' : pct >= 35 ? '#3b82f6' : '#64748b';
+          return `<span style="font-weight:700;font-size:13px;color:${color}">${pct}</span><span style="color:var(--muted);font-size:10px">/100</span>`;
         }
       },
       // 6: RSI
@@ -1178,13 +1172,41 @@ function buildSignalsTable(rows) {
           return volBar(d, row['% Change']);
         }
       },
-      // 11: Fund Score
+      // 12: P/E
+      { data: 'P/E', render: (d, t) => {
+          if (t !== 'display') return d ?? 9999;
+          return (d !== null && d !== undefined) ? `<span style="font-size:12px">${d.toFixed(1)}</span>` : '<span style="color:var(--muted)">—</span>';
+        }
+      },
+      // 13: D/E
+      { data: 'D/E', render: (d, t) => {
+          if (t !== 'display') return d ?? 9999;
+          if (d === null || d === undefined) return '<span style="color:var(--muted)">—</span>';
+          const color = d < 0.5 ? 'var(--green)' : d < 1.5 ? 'var(--text)' : 'var(--red)';
+          return `<span style="font-size:12px;color:${color}">${d.toFixed(2)}</span>`;
+        }
+      },
+      // 14: ROE%
+      { data: 'ROE', render: (d, t) => {
+          if (t !== 'display') return d ?? -999;
+          if (d === null || d === undefined) return '<span style="color:var(--muted)">—</span>';
+          const color = d >= 15 ? 'var(--green)' : d >= 8 ? 'var(--text)' : 'var(--red)';
+          return `<span style="font-size:12px;color:${color}">${d.toFixed(1)}%</span>`;
+        }
+      },
+      // 15: Sector
+      { data: 'Sector', render: (d, t) => {
+          if (t !== 'display') return d || '---';
+          return d && d !== '---' ? `<span style="font-size:11px;color:var(--muted2)">${d}</span>` : '<span style="color:var(--muted)">—</span>';
+        }
+      },
+      // 16: Fund Score
       { data: 'Fund Score', render: (d, t) => {
           if (t !== 'display') return d ?? -1;
           return (d !== null && d !== undefined) ? scoreBar(d, 5) : '<span style="color:var(--muted)">—</span>';
         }
       },
-      // 12: Rec
+      // 17: Rec
       { data: 'Recommendation', render: (d, t) => {
           if (t !== 'display') return d || '---';
           if (!d || d === '---') return '<span style="color:var(--muted)">—</span>';
@@ -1194,13 +1216,13 @@ function buildSignalsTable(rows) {
           return '<span style="color:var(--muted)">—</span>';
         }
       },
-      // 13: Final Score
+      // 18: Final Score
       { data: 'Final Score', render: (d, t) => {
           if (t !== 'display') return d ?? -1;
           return (d !== null && d !== undefined) ? scoreBar(d, 1) : '<span style="color:var(--muted)">—</span>';
         }
       },
-      // 14: Chart
+      // 19: Chart
       { data: 'Chart', orderable: false, render: (d, t) => {
           if (t !== 'display') return '';
           return d ? `<a href="${d}" target="_blank" class="tv-link">↗ Chart</a>` : '—';

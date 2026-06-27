@@ -520,11 +520,6 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             # ── Consensus (4 signals) ──
             consensus, strength = _consensus(macd_sig, rsi_sig, ut_sig, ema_sig)
 
-            # Suppress Buy signals in low-confidence No Uptrend stocks
-            if trend == 'No Uptrend' and trend_score < 20 and consensus in ('Buy', 'Strong Buy'):
-                consensus = 'Neutral'
-                strength  = 0
-
             return {
                 'Stock':           stock,
                 'Consensus':       consensus,
