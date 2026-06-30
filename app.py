@@ -1,3 +1,10 @@
+import curl_cffi.requests as requests_cffi
+_orig_request = requests_cffi.Session.request
+def _patched_request(self, *args, **kwargs):
+    kwargs['verify'] = False
+    return _orig_request(self, *args, **kwargs)
+requests_cffi.Session.request = _patched_request
+
 import os
 import io
 import math
@@ -58,26 +65,23 @@ def load_custom_stocks():
             return []
     return []
 
-
 def save_custom_stocks(stocks):
     with open(CUSTOM_STOCKS_FILE, "w") as f:
         json.dump(stocks, f)
 
-
 def get_tech_stocks():
     custom = load_custom_stocks()
-    return list(dict.fromkeys(DEFAULT_NIFTY100 + custom))
-
+    return list(dict.fromkeys(DEFAULT_NIFTY50 + DEFAULT_NIFTY100 + custom))
 
 def get_fund_stocks():
     custom = load_custom_stocks()
-    return list(dict.fromkeys(DEFAULT_NIFTY50 + custom))
+    return list(dict.fromkeys(DEFAULT_NIFTY50 + DEFAULT_NIFTY100 + custom))
 
 
 # ── Background scan threads ───────────────────────────────────────────────────
-def do_tech_scan(period, interval):
+def do_tech_scan(period, interval, rsi_buy_thresh=30, rsi_sell_thresh=70):
     scan_status["tech"] = "running"
-    scan_params["tech"] = {"period": period, "interval": interval}
+    scan_params["tech"] = {"period": period, "interval": interval, "rsi_buy": rsi_buy_thresh, "rsi_sell": rsi_sell_thresh}
     scan_progress["tech"] = {"current": 0, "total": 0}
     try:
         stocks = get_tech_stocks()
@@ -87,7 +91,8 @@ def do_tech_scan(period, interval):
             scan_progress["tech"] = {"current": current, "total": total}
 
         results = run_technical_scan(stocks, period=period, interval=interval,
-                                     progress_cb=progress_cb)
+                                     progress_cb=progress_cb, 
+                                     rsi_buy_thresh=rsi_buy_thresh, rsi_sell_thresh=rsi_sell_thresh)
         if results:
             df = pd.DataFrame(results)
             df.to_csv(TECH_CSV, index=False)
@@ -165,6 +170,10 @@ def load_tech_csv():
             'RSI Signal':   _str_or(r, 'RSI Signal',  '---'),
             'UT Bot':       _str_or(r, 'UT Bot',       '---'),
             'EMA Cross':       _str_or(r, 'EMA Cross',       '---'),
+            'Bollinger':       _str_or(r, 'Bollinger',       '---'),
+            'Supertrend':      _str_or(r, 'Supertrend',      '---'),
+            'StochRSI':        _str_or(r, 'StochRSI',        '---'),
+            'VWAP':            _float_or_none(r.get('VWAP', '')),
             '200 EMA Cross':   _str_or(r, '200 EMA Cross',   '---'),
             'Trend Score':     _float_or_none(r.get('Trend Score',    '')),
             'Trend Reasons':   _str_or(r, 'Trend Reasons',   ''),
@@ -198,6 +207,8 @@ def load_fund_csv():
             'Sector Med P/E': _float_or_none(r.get('Sector Med P/E', '')),
             'D/E':            _float_or_none(r.get('D/E', '')),
             'ROE':            _float_or_none(r.get('ROE', '')),
+            'ROA':            _float_or_none(r.get('ROA', '')),
+            'Div Yield':      _float_or_none(r.get('Div Yield', '')),
             'RSI':            _float_or_none(r.get('RSI', '')),
             'Fund Score':     _float_or_none(r.get('Fund Score', '')),
             'Tech Score':     _float_or_none(r.get('Tech Score', '')),
@@ -267,6 +278,10 @@ def data_signals():
             'MACD Signal':    tr.get('MACD Signal'),
             'UT Bot':         tr.get('UT Bot'),
             'EMA Cross':       tr.get('EMA Cross'),
+            'Bollinger':       tr.get('Bollinger'),
+            'Supertrend':      tr.get('Supertrend'),
+            'StochRSI':        tr.get('StochRSI'),
+            'VWAP':            tr.get('VWAP'),
             '200 EMA Cross':   tr.get('200 EMA Cross'),
             'Trend Score':     tr.get('Trend Score'),
             'Trend Reasons':   tr.get('Trend Reasons'),
@@ -285,6 +300,8 @@ def data_signals():
             'P/E':            fr.get('P/E'),
             'D/E':            fr.get('D/E'),
             'ROE':            fr.get('ROE'),
+            'ROA':            fr.get('ROA'),
+            'Div Yield':      fr.get('Div Yield'),
         })
 
     tech_mtime = os.path.getmtime(TECH_CSV) if os.path.exists(TECH_CSV) else None
@@ -332,6 +349,10 @@ def download_combined():
             'MACD Signal':    tr.get('MACD Signal', ''),
             'UT Bot':         tr.get('UT Bot', ''),
             'EMA Cross':      tr.get('EMA Cross', ''),
+            'Bollinger':      tr.get('Bollinger', ''),
+            'Supertrend':     tr.get('Supertrend', ''),
+            'StochRSI':       tr.get('StochRSI', ''),
+            'VWAP':           tr.get('VWAP', ''),
             '200 EMA Cross':  tr.get('200 EMA Cross', ''),
             'Vol Ratio':      tr.get('Vol Ratio', ''),
             'Vol Spike':      tr.get('Vol Spike', ''),
@@ -345,6 +366,8 @@ def download_combined():
             'P/E':            fr.get('P/E', ''),
             'D/E':            fr.get('D/E', ''),
             'ROE':            fr.get('ROE', ''),
+            'ROA':            fr.get('ROA', ''),
+            'Div Yield':      fr.get('Div Yield', ''),
         })
     if not merged:
         return jsonify({"error": "No data available. Run a scan first."}), 404
@@ -359,14 +382,65 @@ def download_combined():
     return out
 
 
+@app.route("/api/run/report_sync", methods=["POST"])
+def run_report_sync():
+    data = request.json or {}
+    t_period = data.get("tech_period", "1y")
+    t_interval = data.get("tech_interval", "1wk")
+    f_period = data.get("fund_period", "1y")
+    f_interval = data.get("fund_interval", "1d")
+
+    stocks = get_tech_stocks()
+    
+    # Run synchronously
+    r_tech = run_technical_scan(stocks, period=t_period, interval=t_interval, progress_cb=lambda c,t: None)
+    if r_tech:
+        scan_results["tech"] = r_tech
+        save_tech_csv(r_tech)
+
+    r_fund = run_fundamental_scan(stocks, period=f_period, interval=f_interval, progress_cb=lambda c,t: None)
+    if r_fund:
+        scan_results["fund"] = r_fund
+        save_fund_csv(r_fund)
+
+    return jsonify({"status": "success"})
+
+
+@app.route("/api/custom_stocks", methods=["GET", "POST"])
+def api_custom_stocks():
+    if request.method == "GET":
+        return jsonify(load_custom_stocks())
+    else:
+        stocks = request.json.get("stocks", [])
+        save_custom_stocks(stocks)
+        return jsonify({"status": "success"})
+
+
+@app.route("/api/run/tech", methods=["POST"])
+def api_run_tech():
+    data = request.json or {}
+    period = data.get("period", "1y")
+    interval = data.get("interval", "1wk")
+    rsi_buy = data.get("rsi_buy", 30)
+    rsi_sell = data.get("rsi_sell", 70)
+    if scan_status["tech"] == "running":
+        return jsonify({"status": "already_running"})
+    t = threading.Thread(target=do_tech_scan, args=(period, interval, rsi_buy, rsi_sell))
+    t.daemon = True
+    t.start()
+    return jsonify({"status": "started"})
+
+
 @app.route("/api/run/<scanner>", methods=["POST"])
 def run_scanner(scanner):
     body     = request.get_json(silent=True) or {}
     period   = body.get("period", "1y")
     interval = body.get("interval", "1wk" if scanner == "tech" else "1d")
+    rsi_buy  = int(body.get("rsi_buy", 30))
+    rsi_sell = int(body.get("rsi_sell", 70))
 
     if scanner == "tech" and scan_status["tech"] != "running":
-        t = threading.Thread(target=do_tech_scan, args=(period, interval), daemon=True)
+        t = threading.Thread(target=do_tech_scan, args=(period, interval, rsi_buy, rsi_sell), daemon=True)
         t.start()
         return jsonify({"status": "started"})
     elif scanner == "fund" and scan_status["fund"] != "running":
@@ -389,7 +463,8 @@ def progress(scanner):
 @app.route("/api/stocks", methods=["GET"])
 def list_stocks():
     custom = load_custom_stocks()
-    return jsonify({"default_tech": DEFAULT_NIFTY100, "default_fund": DEFAULT_NIFTY50, "custom": custom})
+    unified = list(dict.fromkeys(DEFAULT_NIFTY50 + DEFAULT_NIFTY100))
+    return jsonify({"default_list": unified, "custom": custom})
 
 
 @app.route("/api/stocks", methods=["POST"])
@@ -553,6 +628,28 @@ def paper_set_capital():
     return jsonify({'success': True, 'capital': capital})
 
 
+@app.route("/api/paper/download")
+def paper_download():
+    import csv as csv_mod
+    from io import StringIO
+    portfolio = pt.get_portfolio(with_prices=True)
+    si = StringIO()
+    cw = csv_mod.writer(si)
+    cw.writerow(["ID", "Symbol", "Action", "Quantity", "Entry Price", "Entry Date", "Status", "Exit Price", "Exit Date", "Realized PNL", "Unrealized PNL", "Notes"])
+    for t in portfolio.get("open_trades", []) + portfolio.get("closed_trades", []):
+        cw.writerow([
+            t.get("id"), t.get("symbol"), t.get("action"), t.get("quantity"), t.get("entry_price"), 
+            t.get("entry_date"), t.get("status"), t.get("exit_price", ""), t.get("exit_date", ""),
+            t.get("realized_pnl", ""), t.get("unrealized_pnl", ""), t.get("notes", "")
+        ])
+    return Response(
+        si.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": "attachment; filename=paper_trades.csv"}
+    )
+
+
+
 @app.route("/api/paper/price/<symbol>")
 def paper_get_price(symbol):
     sym    = normalize_symbol(symbol)
@@ -564,4 +661,4 @@ def paper_get_price(symbol):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=True)

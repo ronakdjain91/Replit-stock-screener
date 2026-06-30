@@ -7,41 +7,42 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 
-DEFAULT_NIFTY100 = [
-    "HDFCBANK.NS", "RELIANCE.NS", "INFY.NS", "TCS.NS", "HINDUNILVR.NS",
-    "ICICIBANK.NS", "KOTAKBANK.NS", "ITC.NS", "SBIN.NS", "HCLTECH.NS",
-    "ASIANPAINT.NS", "AXISBANK.NS", "LT.NS", "BHARTIARTL.NS",
-    "MARUTI.NS", "NESTLEIND.NS", "POWERGRID.NS", "SUNPHARMA.NS", "TITAN.NS",
-    "ULTRACEMCO.NS", "WIPRO.NS", "ADANIPORTS.NS", "BAJAJ-AUTO.NS",
-    "BAJFINANCE.NS", "BAJAJFINSV.NS", "BPCL.NS", "BRITANNIA.NS", "CIPLA.NS",
-    "COALINDIA.NS", "DIVISLAB.NS", "DRREDDY.NS", "EICHERMOT.NS", "GAIL.NS",
-    "GRASIM.NS", "HEROMOTOCO.NS", "HINDALCO.NS", "IOC.NS", "INDUSINDBK.NS",
-    "JSWSTEEL.NS", "NTPC.NS", "ONGC.NS", "SHREECEM.NS", "TATAMOTORS.NS",
-    "TATASTEEL.NS", "TECHM.NS", "UPL.NS", "TATAELXSI.NS", "WOCKPHARMA.NS",
-    "ZEEL.NS", "ADANIGREEN.NS", "AMBUJACEM.NS", "AUROPHARMA.NS",
-    "BAJAJHLDNG.NS", "BANDHANBNK.NS", "BERGEPAINT.NS", "COLPAL.NS", "DABUR.NS",
-    "DLF.NS", "GODREJCP.NS", "HDFCLIFE.NS", "HINDPETRO.NS", "ICICIPRULI.NS",
-    "IDEA.NS", "IGL.NS", "INDIGO.NS", "LUPIN.NS", "MANAPPURAM.NS", "MARICO.NS",
-    "NHPC.NS", "NMDC.NS", "PETRONET.NS", "PFC.NS", "PIDILITIND.NS", "PNB.NS",
-    "RAMCOCEM.NS", "RBLBANK.NS", "RECLTD.NS", "SAIL.NS", "SBILIFE.NS",
-    "SIEMENS.NS", "TATACHEM.NS", "TATACONSUM.NS", "UBL.NS", "ICICIGI.NS",
-    "GLENMARK.NS", "SUNTV.NS", "PNBHOUSING.NS", "ABCAPITAL.NS", "INDIAMART.NS",
-    "CUB.NS", "DEEPAKNTR.NS", "ABBOTINDIA.NS", "APOLLOTYRE.NS", "M&M.NS",
-    "ADANIENT.NS", "VEDL.NS"
-]
+# ── Stock Universe (updated June 2026) ────────────────────────────────────────
+# Nifty 100 = Nifty 50 + Nifty Next 50
 
 DEFAULT_NIFTY50 = [
-    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
-    "KOTAKBANK.NS", "HINDUNILVR.NS", "SBIN.NS", "LT.NS", "AXISBANK.NS",
-    "ITC.NS", "HCLTECH.NS", "BHARTIARTL.NS", "ASIANPAINT.NS", "MARUTI.NS",
-    "SUNPHARMA.NS", "NESTLEIND.NS", "TITAN.NS", "ULTRACEMCO.NS", "POWERGRID.NS",
-    "ONGC.NS", "NTPC.NS", "INDUSINDBK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS",
-    "BRITANNIA.NS", "DIVISLAB.NS", "EICHERMOT.NS", "GRASIM.NS", "HDFCLIFE.NS",
-    "IOC.NS", "JSWSTEEL.NS", "WIPRO.NS", "TATASTEEL.NS", "COALINDIA.NS",
-    "SBILIFE.NS", "BPCL.NS", "ADANIENT.NS", "TECHM.NS", "M&M.NS",
-    "CIPLA.NS", "HEROMOTOCO.NS", "INDIGO.NS", "SHREECEM.NS", "TATAMOTORS.NS",
-    "UPL.NS", "HINDALCO.NS"
+    "ADANIENT.NS", "ADANIPORTS.NS", "APOLLOHOSP.NS", "ASIANPAINT.NS",
+    "AXISBANK.NS", "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BAJAJFINSV.NS",
+    "BEL.NS", "BHARTIARTL.NS", "BRITANNIA.NS", "CIPLA.NS",
+    "COALINDIA.NS", "DIVISLAB.NS", "DRREDDY.NS", "EICHERMOT.NS",
+    "GRASIM.NS", "HCLTECH.NS", "HDFCBANK.NS", "HDFCLIFE.NS",
+    "HEROMOTOCO.NS", "HINDALCO.NS", "HINDUNILVR.NS", "ICICIBANK.NS",
+    "INDUSINDBK.NS", "INFY.NS", "ITC.NS", "JSWSTEEL.NS",
+    "KOTAKBANK.NS", "LT.NS", "M&M.NS", "MARUTI.NS",
+    "NESTLEIND.NS", "NTPC.NS", "ONGC.NS", "POWERGRID.NS",
+    "RELIANCE.NS", "SBILIFE.NS", "SHRIRAMFIN.NS", "SBIN.NS",
+    "SUNPHARMA.NS", "TCS.NS", "TATACONSUM.NS", "TATAMOTORS.NS",
+    "TATASTEEL.NS", "TECHM.NS", "TITAN.NS", "ULTRACEMCO.NS",
+    "MCDOWELL-N.NS", "WIPRO.NS"
 ]
+
+DEFAULT_NIFTY_NEXT50 = [
+    "ABB.NS", "ABBOTINDIA.NS", "AMBUJACEM.NS", "AUROPHARMA.NS",
+    "BANKBARODA.NS", "BERGEPAINT.NS", "BOSCHLTD.NS", "BPCL.NS",
+    "CANBK.NS", "CHOLAFIN.NS", "COLPAL.NS", "DABUR.NS",
+    "DLF.NS", "GAIL.NS", "GODREJCP.NS", "HAL.NS",
+    "HAVELLS.NS", "ICICIPRULI.NS", "ICICIGI.NS", "INDIGO.NS",
+    "IOC.NS", "IRCTC.NS", "JINDALSTEL.NS", "JSWENERGY.NS",
+    "LICI.NS", "LUPIN.NS", "MARICO.NS", "NAUKRI.NS",
+    "NHPC.NS", "NMDC.NS", "OFSS.NS", "PFC.NS",
+    "PIDILITIND.NS", "PNB.NS", "RECLTD.NS", "SAIL.NS",
+    "SIEMENS.NS", "SRF.NS", "TATAELXSI.NS", "TATAPOWER.NS",
+    "TORNTPHARM.NS", "TRENT.NS", "TVSMOTORS.NS", "UPL.NS",
+    "VEDL.NS", "VBL.NS", "ZOMATO.NS", "ZYDUSLIFE.NS",
+    "DEEPAKNTR.NS", "SHREECEM.NS"
+]
+
+DEFAULT_NIFTY100 = DEFAULT_NIFTY50 + DEFAULT_NIFTY_NEXT50
 
 VALID_PERIODS = {"3mo", "6mo", "1y", "2y", "5y"}
 VALID_INTERVALS_TECH = {"1d", "1wk", "1mo"}
@@ -67,7 +68,7 @@ def flatten_columns(df):
 
 
 def generate_tv_link(symbol):
-    return f"https://in.tradingview.com/symbols/NSE:{symbol.replace('.NS', '/')}/"
+    return f"https://in.tradingview.com/symbols/NSE:{symbol.replace('.NS', '')}"
 
 
 # ── Native indicators ─────────────────────────────────────────────────────────
@@ -136,6 +137,59 @@ def _adx(high, low, close, period=14):
     except Exception:
         return None
 
+def _bollinger_bands(close, window=20, num_std=2):
+    sma = close.rolling(window=window, min_periods=1).mean()
+    std = close.rolling(window=window, min_periods=1).std()
+    upper_band = sma + (std * num_std)
+    lower_band = sma - (std * num_std)
+    return sma, upper_band, lower_band
+
+
+def _vwma(close, volume, window=20):
+    if volume is None or volume.empty:
+        return _sma(close, window)
+    vp = close * volume
+    return vp.rolling(window=window, min_periods=1).sum() / volume.rolling(window=window, min_periods=1).sum()
+
+
+def _supertrend(high, low, close, period=10, multiplier=3):
+    atr = _atr(pd.DataFrame({'High': high, 'Low': low, 'Close': close}), period)
+    hl2 = (high + low) / 2
+    final_upperband = hl2 + (multiplier * atr)
+    final_lowerband = hl2 - (multiplier * atr)
+    
+    supertrend = pd.Series(0.0, index=close.index)
+    direction = pd.Series(1, index=close.index)
+
+    for i in range(1, len(close)):
+        if close.iloc[i] > final_upperband.iloc[i-1]:
+            direction.iloc[i] = 1
+        elif close.iloc[i] < final_lowerband.iloc[i-1]:
+            direction.iloc[i] = -1
+        else:
+            direction.iloc[i] = direction.iloc[i-1]
+            if direction.iloc[i] == 1 and final_lowerband.iloc[i] < final_lowerband.iloc[i-1]:
+                final_lowerband.iloc[i] = final_lowerband.iloc[i-1]
+            if direction.iloc[i] == -1 and final_upperband.iloc[i] > final_upperband.iloc[i-1]:
+                final_upperband.iloc[i] = final_upperband.iloc[i-1]
+
+        if direction.iloc[i] == 1:
+            supertrend.iloc[i] = final_lowerband.iloc[i]
+        else:
+            supertrend.iloc[i] = final_upperband.iloc[i]
+
+    return supertrend, direction
+
+
+def _stoch_rsi(close, period=14, smoothK=3, smoothD=3):
+    rsi = _rsi(close, period)
+    rsi_min = rsi.rolling(window=period).min()
+    rsi_max = rsi.rolling(window=period).max()
+    stoch_rsi = (rsi - rsi_min) / (rsi_max - rsi_min) * 100
+    k = stoch_rsi.rolling(window=smoothK).mean()
+    d = k.rolling(window=smoothD).mean()
+    return k, d
+
 
 def _analyze_trend(daily_close, daily_high=None, daily_low=None, daily_vol=None):
     """
@@ -156,7 +210,7 @@ def _analyze_trend(daily_close, daily_high=None, daily_low=None, daily_vol=None)
     # ── 1. Moving Average Alignment (max 30 pts) ──────────────────────────────
     sma20  = float(_sma(daily_close, 20).iloc[-1])
     sma50  = float(_sma(daily_close, 50).iloc[-1])
-    sma200 = float(_sma(daily_close, min(200, n)).iloc[-1]) if n >= 50 else None
+    sma200 = float(_sma(daily_close, 200).iloc[-1]) if n >= 200 else None
 
     ma_pts = 0
     ma_ok  = []
@@ -320,14 +374,44 @@ def signal_macd(hist):
     return '---'
 
 
-def signal_rsi(rsi_series):
+def signal_rsi(rsi_series, buy_thresh=30, sell_thresh=70):
     r = rsi_series.dropna()
     if len(r) < 2:
         return '---'
     cur, prev = r.iloc[-1], r.iloc[-2]
-    if cur <= 40 and prev > 40:
+    if cur <= buy_thresh and prev > buy_thresh:
         return 'Buy'
-    if cur >= 60 and prev < 60:
+    if cur >= sell_thresh and prev < sell_thresh:
+        return 'Sell'
+    return '---'
+
+
+def signal_bb(close, lower_band, upper_band):
+    if len(close) < 2:
+        return '---'
+    if close.iloc[-1] > lower_band.iloc[-1] and close.iloc[-2] <= lower_band.iloc[-2]:
+        return 'Buy'
+    if close.iloc[-1] < upper_band.iloc[-1] and close.iloc[-2] >= upper_band.iloc[-2]:
+        return 'Sell'
+    return '---'
+
+
+def signal_supertrend(direction):
+    if len(direction) < 2:
+        return '---'
+    if direction.iloc[-1] == 1 and direction.iloc[-2] == -1:
+        return 'Buy'
+    if direction.iloc[-1] == -1 and direction.iloc[-2] == 1:
+        return 'Sell'
+    return '---'
+
+
+def signal_stoch_rsi(k, d):
+    if len(k) < 2 or pd.isna(k.iloc[-1]) or pd.isna(d.iloc[-1]):
+        return '---'
+    if k.iloc[-1] > d.iloc[-1] and k.iloc[-2] <= d.iloc[-2] and k.iloc[-1] < 20:
+        return 'Buy'
+    if k.iloc[-1] < d.iloc[-1] and k.iloc[-2] >= d.iloc[-2] and k.iloc[-1] > 80:
         return 'Sell'
     return '---'
 
@@ -347,17 +431,19 @@ def signal_ema_cross(close):
 
 # ── Consensus ─────────────────────────────────────────────────────────────────
 
-def _consensus(macd_sig, rsi_sig, ut_sig, ema_sig='---'):
-    """Return (consensus_label, signal_count) using up to 4 signals."""
-    signals = [macd_sig, rsi_sig, ut_sig, ema_sig]
+def _consensus(macd_sig, rsi_sig, ut_sig, ema_sig, bb_sig='---', st_sig='---', stoch_sig='---'):
+    """Return (consensus_label, signal_count) using up to 7 signals."""
+    signals = [macd_sig, rsi_sig, ut_sig, ema_sig, bb_sig, st_sig, stoch_sig]
     buys  = sum(1 for s in signals if s == 'Buy')
     sells = sum(1 for s in signals if s == 'Sell')
-    if buys == 4:   return 'Strong Buy',  4
-    if buys == 3:   return 'Buy',          3
-    if sells == 4:  return 'Strong Sell',  4
-    if sells == 3:  return 'Sell',         3
-    if buys == 2:   return 'Neutral',      2
-    if sells == 2:  return 'Neutral',      2
+    
+    if buys >= 5:   return 'Strong Buy',  buys
+    if buys >= 4:   return 'Buy',         buys
+    if sells >= 5:  return 'Strong Sell', sells
+    if sells >= 4:  return 'Sell',        sells
+    
+    if buys >= 2:   return 'Neutral',     buys
+    if sells >= 2:  return 'Neutral',     sells
     return 'Neutral', max(buys, sells)
 
 
@@ -389,7 +475,7 @@ def _atr_mult_from_beta(beta):
 
 # ── Technical scan (parallel) ─────────────────────────────────────────────────
 
-def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
+def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None, rsi_buy_thresh=30, rsi_sell_thresh=70):
     if period not in VALID_PERIODS:
         period = '1y'
     if interval not in VALID_INTERVALS_TECH:
@@ -434,7 +520,7 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
 
             # ── Reference SMAs (kept for display) ──
             sma50_val  = safe_float(_sma(daily_close, 50).iloc[-1], 2)
-            sma200_val = safe_float(_sma(daily_close, min(200, len(daily_close))).iloc[-1], 2)
+            sma200_val = safe_float(_sma(daily_close, 200).iloc[-1], 2) if len(daily_close) >= 200 else None
 
             # ── High / Low / Volume series for trend analysis ──
             daily_high_s = daily['High'].ffill()   if 'High'   in daily.columns else None
@@ -449,7 +535,7 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             trend_warnings_str = ' | '.join(trend_warnings)
 
             # ── 200 EMA cross — did price cross 200-day EMA in last 10 candles? ──
-            ema200       = _ema(daily_close, min(200, len(daily_close)))
+            ema200       = _ema(daily_close, 200) if len(daily_close) >= 200 else _ema(daily_close, len(daily_close))
             ema200_cross = '---'
             look = min(10, len(daily_close) - 1)
             for i in range(1, look + 1):
@@ -495,12 +581,20 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             rsi_series = _rsi(close)
             _, _, hist = _macd(close)
             buy_sig, sell_sig = calculate_ut_bot(sig_df, a=atr_mult, c=10)
+            
+            _, upper_bb, lower_bb = _bollinger_bands(close)
+            vwma = _vwma(close, sig_df.get('Volume', None))
+            st_series, st_dir = _supertrend(sig_df['High'], sig_df['Low'], close)
+            stoch_k, stoch_d = _stoch_rsi(close)
 
             macd_sig = signal_macd(hist)
-            rsi_sig  = signal_rsi(rsi_series)
+            rsi_sig  = signal_rsi(rsi_series, buy_thresh=rsi_buy_thresh, sell_thresh=rsi_sell_thresh)
             ut_sig   = ('Buy'  if buy_sig.iloc[-1]  else
                         'Sell' if sell_sig.iloc[-1] else '---')
             ema_sig  = signal_ema_cross(close)
+            bb_sig   = signal_bb(close, lower_bb, upper_bb)
+            st_sig   = signal_supertrend(st_dir)
+            stoch_sig= signal_stoch_rsi(stoch_k, stoch_d)
 
             # ── 50 SMA (from signal df) ──
             sma50_s   = _sma(close, 50)
@@ -517,8 +611,8 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
             rsi_val       = safe_float(rsi_series.dropna().iloc[-1], 1)  if not rsi_series.dropna().empty else None
             macd_hist_val = safe_float(hist.dropna().iloc[-1], 3)        if not hist.dropna().empty      else None
 
-            # ── Consensus (4 signals) ──
-            consensus, strength = _consensus(macd_sig, rsi_sig, ut_sig, ema_sig)
+            # ── Consensus (7 signals) ──
+            consensus, strength = _consensus(macd_sig, rsi_sig, ut_sig, ema_sig, bb_sig, st_sig, stoch_sig)
 
             return {
                 'Stock':           stock,
@@ -538,6 +632,10 @@ def run_technical_scan(stocks, period='1y', interval='1wk', progress_cb=None):
                 'RSI Signal':   rsi_sig,
                 'UT Bot':       ut_sig,
                 'EMA Cross':    ema_sig,
+                'Bollinger':    bb_sig,
+                'Supertrend':   st_sig,
+                'StochRSI':     stoch_sig,
+                'VWAP':         safe_float(vwma.dropna().iloc[-1], 2) if not vwma.dropna().empty else None,
                 '200 EMA Cross': ema200_cross,
                 'Beta':         beta,
                 '200 SMA':      sma200_val,
@@ -606,9 +704,11 @@ def _fetch_fund_raw(sym, period, interval):
 
     pe     = safe_float(info.get('trailingPE') or info.get('forwardPE'))
     dte    = safe_float(info.get('debtToEquity'))
-    roe    = safe_float(info.get('returnOnEquity') or info.get('returnOnAssets'))
+    roe    = safe_float(info.get('returnOnEquity'))
+    roa    = safe_float(info.get('returnOnAssets'))
     pb     = safe_float(info.get('priceToBook'))
     eg     = safe_float(info.get('earningsGrowth'))
+    dy     = safe_float(info.get('dividendYield'))
     sector = info.get('sector') or 'Unknown'
 
     return {
@@ -619,8 +719,10 @@ def _fetch_fund_raw(sym, period, interval):
         'pe':     pe,
         'dte':    dte,
         'roe':    roe,
+        'roa':    roa,
         'pb':     pb,
         'eg':     eg,
+        'dy':     dy,
         'sector': sector,
     }
 
@@ -677,8 +779,10 @@ def run_fundamental_scan(stocks, period='1y', interval='1d', progress_cb=None):
             pe     = item['pe']
             dte    = item['dte']
             roe    = item['roe']
+            roa    = item['roa']
             pb     = item.get('pb')
             eg     = item.get('eg')
+            dy     = item.get('dy')
             sector = item['sector']
             sector_med_pe = sector_medians.get(sector)
 
@@ -710,14 +814,31 @@ def run_fundamental_scan(stocks, period='1y', interval='1d', progress_cb=None):
             # Fundamental sub-score (sector-relative P/E)
             fscore = _pe_relative_score(pe, sector_med_pe)
 
+            is_financial = sector in ['Financial Services', 'Banks']
+
             if dte is not None:
-                fscore += 1 if dte < 50 else (0.5 if dte < 100 else 0)
+                if is_financial:
+                    # High debt is normal for financials
+                    fscore += 1 if dte < 500 else (0.5 if dte < 1000 else 0)
+                else:
+                    fscore += 1 if dte < 50 else (0.5 if dte < 100 else 0)
+
             if roe is not None:
                 fscore += 1 if roe >= 0.15 else (0.5 if roe > 0.08 else 0)
+            elif roa is not None:
+                # ROA is typically lower than ROE, adjust thresholds
+                fscore += 1 if roa >= 0.05 else (0.5 if roa > 0.02 else 0)
 
             # P/B ratio — value indicator (lower = more undervalued)
             if pb is not None and pb > 0:
-                fscore += 1 if pb < 1.5 else (0.5 if pb < 3.0 else 0)
+                if is_financial:
+                    fscore += 1 if pb < 2.0 else (0.5 if pb < 4.0 else 0)
+                else:
+                    fscore += 1 if pb < 1.5 else (0.5 if pb < 3.0 else 0)
+                    
+            # Dividend yield
+            if dy is not None:
+                fscore += 1 if dy > 0.02 else (0.5 if dy > 0.01 else 0)
 
             # Earnings growth — profitability momentum
             if eg is not None:
@@ -745,12 +866,14 @@ def run_fundamental_scan(stocks, period='1y', interval='1d', progress_cb=None):
                 pass
 
             fscore = round(fscore, 2)
-            final  = round(0.6 * (fscore / 5) + 0.4 * (tscore / 5), 3)
+            final  = round(0.6 * min(fscore / 8.0, 1.0) + 0.4 * min(tscore / 4.5, 1.0), 3)
             rec    = 'Sell'
             if fscore >= 2.5:
                 rec = 'Buy' if final >= 0.65 else ('Hold' if final >= 0.45 else 'Sell')
 
             roe_display = safe_float(roe * 100, 1) if roe is not None else None
+            roa_display = safe_float(roa * 100, 1) if roa is not None else None
+            dy_display  = safe_float(dy * 100, 2) if dy is not None else None
 
             results.append({
                 'Symbol':           sym,
@@ -760,6 +883,9 @@ def run_fundamental_scan(stocks, period='1y', interval='1d', progress_cb=None):
                 'Sector Med P/E':   safe_float(sector_med_pe, 1),
                 'D/E':              safe_float(dte, 1),
                 'ROE':              roe_display,
+                'ROA':              roa_display,
+                'P/B':              safe_float(pb, 2),
+                'Div Yield':        dy_display,
                 'RSI':              rsi_val,
                 'Fund Score':       fscore,
                 'Tech Score':       round(tscore, 2),
