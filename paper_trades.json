@@ -1,0 +1,96 @@
+{
+  "capital": 10000000.0,
+  "trades": [
+    {
+      "id": "f5e1c943",
+      "symbol": "SBIN.NS",
+      "action": "Buy",
+      "quantity": 2,
+      "entry_price": 1045.2,
+      "entry_date": "27 Jun 2026, 19:55",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": ""
+    },
+    {
+      "id": "040ec4e7",
+      "symbol": "AUROPHARMA.NS",
+      "action": "Buy",
+      "quantity": 10,
+      "entry_price": 1554.6,
+      "entry_date": "27 Jun 2026, 19:59",
+      "status": "closed",
+      "exit_price": 1552.6,
+      "exit_date": "01 Jul 2026, 18:19",
+      "realized_pnl": -20.0,
+      "notes": ""
+    },
+    {
+      "id": "3c20e736",
+      "symbol": "OFSS.NS",
+      "action": "Buy",
+      "quantity": 2,
+      "entry_price": 10955.0,
+      "entry_date": "27 Jun 2026, 21:02",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": ""
+    },
+    {
+      "id": "0e4b3f83",
+      "symbol": "PIDILITIND.NS",
+      "action": "Buy",
+      "quantity": 10,
+      "entry_price": 1595.8,
+      "entry_date": "27 Jun 2026, 21:10",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": ""
+    },
+    {
+      "id": "2e0aab35",
+      "symbol": "LUPIN.NS",
+      "action": "Buy",
+      "quantity": 7,
+      "entry_price": 2418.4,
+      "entry_date": "30 Jun 2026, 11:47",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": ""
+    },
+    {
+      "id": "87d3aceb",
+      "symbol": "MARUTI.NS",
+      "action": "Buy",
+      "quantity": 1,
+      "entry_price": 14044.0,
+      "entry_date": "30 Jun 2026, 11:48",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": "Trend + Volume"
+    },
+    {
+      "id": "3db5b18d",
+      "symbol": "IKS.NS",
+      "action": "Buy",
+      "quantity": 10,
+      "entry_price": 1800.2,
+      "entry_date": "01 Jul 2026, 18:18",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": "Strong Trend + Strong volume"
+    }
+  ]
+}

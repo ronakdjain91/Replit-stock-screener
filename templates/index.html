@@ -58,7 +58,7 @@
     .tab-btn.active{color:var(--accent2);border-bottom-color:var(--accent2)}
 
     /* ── LAYOUT ── */
-    .container{padding:16px 20px;max-width:1700px;margin:0 auto}
+    .container{padding:8px 20px 16px 20px;max-width:1700px;margin:0 auto}
     .panel{display:none}.panel.active{display:block}
 
     /* ── STAT CARDS ── */
@@ -76,11 +76,11 @@
     .stat-sub{font-size:10px;color:var(--muted)}
 
     /* ── TOOLBAR ── */
-    .toolbar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px}
+    .toolbar{background:transparent;border:none;padding:0 4px;margin-bottom:10px}
     .toolbar-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
     .toolbar-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-    .toolbar-title{font-size:13px;font-weight:700;color:var(--text)}
-    .toolbar-meta{font-size:11px;color:var(--muted);margin-top:2px}
+    .toolbar-title{display:none} /* Hidden to save space */
+    .toolbar-meta{font-size:11px;color:var(--muted);margin-top:0}
 
     /* ── PROGRESS BAR ── */
     .prog-wrap{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:none}
@@ -192,6 +192,9 @@
     .stock-link:hover{color:var(--accent2);text-decoration:underline}
     .concall-link{color:var(--muted);font-size:11px;text-decoration:none;margin-left:4px}
     .concall-link:hover{color:var(--accent2)}
+    .quick-links{display:flex;align-items:center;gap:6px;font-size:11px}
+    .quick-links a{color:var(--accent);text-decoration:none;font-weight:600;padding:2px 4px;border-radius:4px;border:1px solid var(--border);background:var(--surface2)}
+    .quick-links a:hover{background:var(--accent);color:#fff}
 
     /* ── FROZEN TABLE HEADER (scrollY layout) ── */
     div.dataTables_scrollHead{background:var(--surface)!important;border-bottom:1px solid var(--border)}
@@ -324,8 +327,8 @@
       .stat-card{padding:10px 12px}.stat-value{font-size:18px}
       header{padding:0 14px}.tabs{padding:0 12px}
       .tab-btn{padding:0 12px;font-size:12px}
-      .toolbar{padding:10px 12px}.toolbar-top{gap:8px}
-      .toolbar-title{font-size:12px}.tf-label{display:none}
+      .toolbar{padding:0 4px}.toolbar-top{gap:8px}
+      .tf-label{display:none}
       .filter-toggle{display:inline-flex}
       .filter-inner{display:none;flex-direction:column;align-items:flex-start}
       .filter-inner.open{display:flex}
@@ -519,6 +522,7 @@
 <header>
   <div class="logo">Nifty <span>Stock Scanner</span></div>
   <div class="header-right">
+    <button class="btn btn-ghost btn-sm" onclick="toggleFullscreen()">⛶ Fullscreen</button>
     <button class="btn btn-ghost btn-sm" onclick="openStocksModal()">⚙ Manage Stocks</button>
     <button class="btn btn-primary btn-sm" onclick="openSettings()">⚙ <span class="hide-xs">Settings & </span>Filters</button>
   </div>
@@ -527,7 +531,7 @@
 <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid var(--border);">
   <div class="tabs" style="border-bottom:none;">
     <button class="tab-btn active" onclick="switchTab('signals',this)">📊 Buy/Sell Calls</button>
-    <button class="tab-btn" onclick="switchTab('paper',this);loadPaperPortfolio(false)">📝 Paper Trade</button>
+    <button class="tab-btn" onclick="switchTab('paper',this);loadPaperPortfolio(true)">📝 Paper Trade</button>
   </div>
   <div style="display:flex; gap:8px; padding-bottom:6px; padding-right:20px;">
     <button id="dl-report-btn" class="btn btn-sm btn-success" onclick="downloadAnalysisReport()" style="gap:4px;">⬇ Analysis Report</button>
@@ -543,7 +547,6 @@
     <div class="toolbar">
       <div class="toolbar-top">
         <div>
-          <div class="toolbar-title">MACD · RSI · UT Bot · EMA — Buy/Sell Calls</div>
           <div class="toolbar-meta" id="meta-signals">Run Tech and/or Fund scan to see signals</div>
         </div>
         <div class="toolbar-actions">
@@ -581,6 +584,7 @@
           <thead>
             <tr>
               <th>Stock</th>
+              <th>Links</th>
               <th>Price</th>
               <th>% Chg</th>
               <th>Consensus</th>
@@ -631,7 +635,6 @@
     <div class="toolbar" style="margin-bottom:10px">
       <div class="toolbar-top">
         <div>
-          <div class="toolbar-title">Paper Portfolio</div>
           <div class="toolbar-meta" id="pp-meta">Track signals with virtual money before trading real.</div>
         </div>
         <div class="toolbar-actions">
@@ -1422,7 +1425,7 @@ function buildSignalsTable(rows) {
   signalsTable = $('#signals-table').DataTable({
     data: rows,
     scrollX: true,
-    scrollY: "calc(100vh - 430px)",
+    scrollY: "calc(100vh - 200px)",
     scrollCollapse: true,
     fixedColumns: { start: 1 },
     pageLength: 100,
@@ -1441,16 +1444,22 @@ function buildSignalsTable(rows) {
       { data: 'Stock', render: (d, t) => {
           if (t !== 'display') return (d || '').replace('.NS','');
           const sym = (d || '').replace('.NS','');
-          const kiteUrl    = `https://kite.zerodha.com/chart/web/nse/NSE:${sym}/${sym}`;
-          const gfinUrl    = `https://www.google.com/finance/quote/${sym}:NSE`;
-          const concallUrl = `https://www.screener.in/company/${sym}/`;
-          return `<div class="stock-name">
-            <a href="${kiteUrl}" target="_blank" rel="noopener" class="stock-link">${sym}</a>
-          </div>
-          <div class="stock-sub">
-            ${d}
-            <a href="${gfinUrl}" target="_blank" rel="noopener" class="concall-link" title="Google Finance Chart" style="margin-left:4px; text-decoration:none;">📈</a>
-            <a href="${concallUrl}" target="_blank" rel="noopener" class="concall-link" title="Concalls on Screener.in" style="margin-left:4px; text-decoration:none;">📋</a>
+          return `<div class="stock-name">${sym}</div><div class="stock-sub">${d}</div>`;
+        }
+      },
+      // 0b: Links
+      { data: 'Stock', orderable: false, render: (d, t) => {
+          if (t !== 'display') return '';
+          const sym = (d || '').replace('.NS','');
+          const tvUrl   = `https://www.tradingview.com/symbols/NSE-${sym}/`;
+          const gfinUrl = `https://www.google.com/finance/quote/${sym}:NSE`;
+          const scrUrl  = `https://www.screener.in/company/${sym}/`;
+          const kiteUrl = `https://kite.zerodha.com/chart/web/nse/NSE:${sym}/${sym}`;
+          return `<div class="quick-links">
+            <a href="${tvUrl}" target="_blank" rel="noopener" title="TradingView Chart">TV</a>
+            <a href="${gfinUrl}" target="_blank" rel="noopener" title="Google Finance">GF</a>
+            <a href="${scrUrl}" target="_blank" rel="noopener" title="Screener.in">SR</a>
+            <a href="${kiteUrl}" target="_blank" rel="noopener" title="Kite Zerodha">KT</a>
           </div>`;
         }
       },
@@ -1900,7 +1909,7 @@ function openAddTradeFromScanner(symbol, price, action) {
     .find(b => b.textContent.includes('Paper Trade'));
   if (paperBtn && !paperBtn.classList.contains('active')) {
     paperBtn.click();
-    loadPaperPortfolio(false);
+    loadPaperPortfolio(true);
   }
 
   // Small delay to let tab switch render
@@ -2186,7 +2195,7 @@ function submitPaperTrade() {
       document.getElementById('pt-price').value  = '';
       document.getElementById('pt-notes').value  = '';
       setPtAction('Buy');
-      loadPaperPortfolio(false);
+      loadPaperPortfolio(true);
     } else {
       msg.innerHTML = `<span style="color:var(--red)">✕ ${d.error}</span>`;
     }
@@ -2240,7 +2249,7 @@ function confirmClose() {
   }).then(r => r.json()).then(d => {
     if (d.success) {
       closeCloseModal();
-      loadPaperPortfolio(false);
+      loadPaperPortfolio(true);
     } else {
       msg.innerHTML = `<span style="color:var(--red)">✕ ${d.error}</span>`;
     }
@@ -2252,7 +2261,7 @@ function deleteTrade(id, isOpen) {
   if (!confirm('Delete this trade record?')) return;
   fetch(`/api/paper/trade/${id}`, { method: 'DELETE' })
     .then(r => r.json())
-    .then(d => { if (d.success) loadPaperPortfolio(false); });
+    .then(d => { if (d.success) loadPaperPortfolio(true); });
 }
 
 // ── Closed Trades Toggle ───────────────────────────────────────────
@@ -2280,7 +2289,7 @@ function saveCapital() {
   }).then(r => r.json()).then(d => {
     if (d.success) {
       document.getElementById('capital-modal').classList.remove('open');
-      loadPaperPortfolio(false);
+      loadPaperPortfolio(true);
     } else {
       msg.innerHTML = `<span style="color:var(--red)">✕ ${d.error}</span>`;
     }

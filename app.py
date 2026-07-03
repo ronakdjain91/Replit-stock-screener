@@ -65,17 +65,38 @@ def load_custom_stocks():
             return []
     return []
 
+def load_stocks_from_folder():
+    folder = "StockList"
+    stocks = []
+    if os.path.exists(folder):
+        import glob
+        for f in glob.glob(os.path.join(folder, "*.csv")):
+            try:
+                df = pd.read_csv(f)
+                if 'SYMBOL' in df.columns:
+                    for sym in df['SYMBOL']:
+                        sym = str(sym).strip()
+                        if sym and " " not in sym and sym != "nan":
+                            if not sym.endswith(".NS"):
+                                sym += ".NS"
+                            stocks.append(sym)
+            except Exception as e:
+                print(f"Error reading {f}: {e}")
+    return stocks
+
 def save_custom_stocks(stocks):
     with open(CUSTOM_STOCKS_FILE, "w") as f:
         json.dump(stocks, f)
 
 def get_tech_stocks():
     custom = load_custom_stocks()
-    return list(dict.fromkeys(DEFAULT_NIFTY50 + DEFAULT_NIFTY100 + custom))
+    folder_stocks = load_stocks_from_folder()
+    return list(dict.fromkeys(DEFAULT_NIFTY50 + DEFAULT_NIFTY100 + custom + folder_stocks))
 
 def get_fund_stocks():
     custom = load_custom_stocks()
-    return list(dict.fromkeys(DEFAULT_NIFTY50 + DEFAULT_NIFTY100 + custom))
+    folder_stocks = load_stocks_from_folder()
+    return list(dict.fromkeys(DEFAULT_NIFTY50 + DEFAULT_NIFTY100 + custom + folder_stocks))
 
 
 # ── Background scan threads ───────────────────────────────────────────────────
