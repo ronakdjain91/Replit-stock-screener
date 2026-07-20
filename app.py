@@ -66,23 +66,35 @@ def load_custom_stocks():
     return []
 
 def load_stocks_from_folder():
-    folder = "StockList"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    folder = os.path.join(base_dir, "StockList")
     stocks = []
     if os.path.exists(folder):
         import glob
         for f in glob.glob(os.path.join(folder, "*.csv")):
             try:
                 df = pd.read_csv(f)
-                if 'SYMBOL' in df.columns:
-                    for sym in df['SYMBOL']:
-                        sym = str(sym).strip()
-                        if sym and " " not in sym and sym != "nan":
-                            if not sym.endswith(".NS"):
-                                sym += ".NS"
-                            stocks.append(sym)
+                if df.empty:
+                    continue
+                symbol_col = None
+                priority = ['symbol', 'stock', 'ticker', 'scrip', 'name', 'code']
+                lower_cols = {c.lower(): c for c in df.columns}
+                for p in priority:
+                    if p in lower_cols:
+                        symbol_col = lower_cols[p]
+                        break
+                if symbol_col is None:
+                    symbol_col = df.columns[0]
+
+                for sym in df[symbol_col].dropna():
+                    sym = str(sym).strip().strip('"').strip("'").strip()
+                    if sym and " " not in sym and sym.lower() != "nan" and not sym.startswith("NIFTY"):
+                        if not sym.endswith(".NS"):
+                            sym += ".NS"
+                        stocks.append(sym)
             except Exception as e:
                 print(f"Error reading {f}: {e}")
-    return stocks
+    return list(dict.fromkeys(stocks))
 
 def save_custom_stocks(stocks):
     with open(CUSTOM_STOCKS_FILE, "w") as f:

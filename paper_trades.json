@@ -91,6 +91,19 @@
       "exit_date": null,
       "realized_pnl": null,
       "notes": "Strong Trend + Strong volume"
+    },
+    {
+      "id": "4d7897dc",
+      "symbol": "TITAN.NS",
+      "action": "Buy",
+      "quantity": 1,
+      "entry_price": 4632.0,
+      "entry_date": "20 Jul 2026, 08:37",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": ""
     }
   ]
 }
