@@ -5,6 +5,7 @@ __pycache__/
 venv/
 .venv/
 *.csv
+!StockList/*.csv
 attached_assets/
 .local/
 .config/
