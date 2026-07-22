@@ -8,10 +8,10 @@
       "quantity": 2,
       "entry_price": 1045.2,
       "entry_date": "27 Jun 2026, 19:55",
-      "status": "open",
-      "exit_price": null,
-      "exit_date": null,
-      "realized_pnl": null,
+      "status": "closed",
+      "exit_price": 1044.4,
+      "exit_date": "21 Jul 2026, 13:22",
+      "realized_pnl": -1.6,
       "notes": ""
     },
     {
@@ -34,10 +34,10 @@
       "quantity": 2,
       "entry_price": 10955.0,
       "entry_date": "27 Jun 2026, 21:02",
-      "status": "open",
-      "exit_price": null,
-      "exit_date": null,
-      "realized_pnl": null,
+      "status": "closed",
+      "exit_price": 11632.0,
+      "exit_date": "21 Jul 2026, 13:22",
+      "realized_pnl": 1354.0,
       "notes": ""
     },
     {
@@ -47,10 +47,10 @@
       "quantity": 10,
       "entry_price": 1595.8,
       "entry_date": "27 Jun 2026, 21:10",
-      "status": "open",
-      "exit_price": null,
-      "exit_date": null,
-      "realized_pnl": null,
+      "status": "closed",
+      "exit_price": 1591.3,
+      "exit_date": "21 Jul 2026, 13:22",
+      "realized_pnl": -45.0,
       "notes": ""
     },
     {
@@ -60,10 +60,10 @@
       "quantity": 7,
       "entry_price": 2418.4,
       "entry_date": "30 Jun 2026, 11:47",
-      "status": "open",
-      "exit_price": null,
-      "exit_date": null,
-      "realized_pnl": null,
+      "status": "closed",
+      "exit_price": 2514.8,
+      "exit_date": "21 Jul 2026, 13:22",
+      "realized_pnl": 674.8,
       "notes": ""
     },
     {
@@ -73,10 +73,10 @@
       "quantity": 1,
       "entry_price": 14044.0,
       "entry_date": "30 Jun 2026, 11:48",
-      "status": "open",
-      "exit_price": null,
-      "exit_date": null,
-      "realized_pnl": null,
+      "status": "closed",
+      "exit_price": 13597.0,
+      "exit_date": "21 Jul 2026, 13:22",
+      "realized_pnl": -447.0,
       "notes": "Trend + Volume"
     },
     {
@@ -104,6 +104,32 @@
       "exit_date": null,
       "realized_pnl": null,
       "notes": ""
+    },
+    {
+      "id": "886b5cc9",
+      "symbol": "ULTRACEMCO.NS",
+      "action": "Buy",
+      "quantity": 1,
+      "entry_price": 12063.0,
+      "entry_date": "21 Jul 2026, 13:19",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": ""
+    },
+    {
+      "id": "efd5e815",
+      "symbol": "MANAPPURAM.NS",
+      "action": "Buy",
+      "quantity": 15,
+      "entry_price": 350.85,
+      "entry_date": "21 Jul 2026, 13:21",
+      "status": "open",
+      "exit_price": null,
+      "exit_date": null,
+      "realized_pnl": null,
+      "notes": "% Chg + Volume + Trend"
     }
   ]
 }
